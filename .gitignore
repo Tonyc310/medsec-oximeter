@@ -1,0 +1,9 @@
+# Build trees: build/<board>.
+/build/
+
+# West workspace state and the Zephyr tree it checks out.
+/.west/
+/deps/
+
+# Python environment that holds west.
+/.venv/

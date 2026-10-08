@@ -1,0 +1,17 @@
+# The Zephyr tree this firmware is built against. The repository root is the west workspace
+# (west init -l app); everything west checks out lands under deps/, which git ignores.
+manifest:
+  remotes:
+    - name: zephyrproject-rtos
+      url-base: https://github.com/zephyrproject-rtos
+
+  projects:
+    - name: zephyr
+      remote: zephyrproject-rtos
+      revision: v4.4.2
+      import:
+        path-prefix: deps
+        # Only the modules an nRF52840 build needs; add one when a feature needs it.
+        name-allowlist:
+          - cmsis_6     # CMSIS-Core for Cortex-M
+          - hal_nordic  # nrfx drivers and the nRF devicetree bindings

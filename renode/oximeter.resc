@@ -1,0 +1,15 @@
+:name: medsec-oximeter
+:description: nRF52840 DK running the pulse oximeter firmware, with its console in a terminal window.
+
+$bin?=$ORIGIN/../build/nrf52840dk/zephyr/zephyr.elf
+
+mach create "oximeter"
+machine LoadPlatformDescription @platforms/boards/nrf52840dk_nrf52840.repl
+
+showAnalyzer sysbus.uart0
+
+macro reset
+"""
+    sysbus LoadELF $bin
+"""
+runMacro $reset

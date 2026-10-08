@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check formatting
+        run: pipx run clang-format==23.1.2 --dry-run --Werror app/src/*.c
+
+  firmware:
+    runs-on: ubuntu-24.04
+    env:
+      RENODE_VERSION: 1.17.0
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      # Fetches the Zephyr tree pinned in app/west.yml and the SDK version it names.
+      - name: Set up Zephyr
+        uses: zephyrproject-rtos/action-zephyr-setup@v1
+        with:
+          app-path: app
+          toolchains: arm-zephyr-eabi
+
+      - name: Build
+        run: west build -b nrf52840dk/nrf52840 -d build/nrf52840dk app
+
+      - name: Install Renode
+        run: |
+          curl -fsSL "https://github.com/renode/renode/releases/download/v${RENODE_VERSION}/renode-${RENODE_VERSION}.linux-portable.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP"
+          renode_dir="$RUNNER_TEMP/renode_${RENODE_VERSION}-portable"
+          pip install -r "$renode_dir/tests/requirements.txt"
+          echo "$renode_dir" >> "$GITHUB_PATH"
+
+      # renode-test writes its report to the working directory, so run it inside the build tree.
+      - name: Renode tests
+        run: |
+          mkdir -p build/renode && cd build/renode
+          renode-test ../../renode/oximeter.robot
+
+      - name: Upload Renode results
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: renode-results
+          path: build/renode/
