@@ -1,0 +1,19 @@
+#include <zephyr/dt-bindings/gpio/arduino-header-r3.h>
+
+/* Renode models the nRF52840's TWI, not its TWIM (EasyDMA) variant of the same I2C block, so
+ * the firmware uses TWI and the image tested in simulation is the one that runs on the board. */
+&arduino_i2c {
+	compatible = "nordic,nrf-twi";
+	status = "okay";
+
+	max30101: max30101@57 {
+		compatible = "maxim,max30101";
+		reg = <0x57>;
+		/* Open drain, so it needs the pull-up. */
+		irq-gpios = <&arduino_header ARDUINO_HEADER_R3_D2 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+		acq-mode = "spo2";
+		smp-sr = <100>;
+		/* 411 us LED pulses give the full 18-bit resolution. */
+		led-pw = <411>;
+	};
+};

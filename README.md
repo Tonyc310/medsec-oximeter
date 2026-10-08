@@ -8,7 +8,23 @@ A Bluetooth pulse oximeter built to the security expectations FDA sets for conne
 
 ## Status
 
-Phase 2 of 7, the baseline device. The firmware boots and logs; the sensor, SpO2 and BLE come next. The baseline is built without security controls on purpose, so the threat model starts from an honest "before" state.
+Phase 2 of 7, the baseline device. The firmware reads red and infrared light from a MAX30101 pulse oximetry sensor; SpO2, heart rate and BLE come next. The baseline is built without security controls on purpose, so the threat model starts from an honest "before" state.
+
+Renode has no model of the MAX30101, so [renode/Max30101.cs](renode/Max30101.cs) adds one: the registers Zephyr's driver uses, the 32-sample FIFO filled at the configured rate, the interrupt line, and a synthetic pulse waveform whose light level, pulse depth and heart rate a test can set.
+
+## Hardware
+
+An nRF52840 DK and a MAX30101 (or MAX30102) breakout, wired to the DK's Arduino header. Not yet tested on the real board.
+
+| Breakout | nRF52840 DK |
+|---|---|
+| SDA | SDA / D14 (P0.26) |
+| SCL | SCL / D15 (P0.27) |
+| INT | D2 (P1.03) |
+| GND | GND |
+| VIN | 5V, if the breakout has its own regulators (most do) |
+
+The DK's GPIO run at 3.0 V: check that the breakout pulls SDA, SCL and INT up to no more than that.
 
 ## Build and run
 
@@ -33,7 +49,7 @@ renode renode/oximeter.resc                # type `start`; the console opens in 
 
 ## Test
 
-The Robot Framework test boots the firmware in [Renode](https://renode.io) 1.17. It needs `renode-test` on `PATH` with its Python packages (`pip install -r <renode>/tests/requirements.txt`). It writes its report to the working directory, so run it from the build tree:
+The Robot Framework test boots the firmware in [Renode](https://renode.io) 1.17 with the sensor model and checks the light levels the firmware reports. It needs `renode-test` on `PATH` with its Python packages (`pip install -r <renode>/tests/requirements.txt`). It writes its report to the working directory, so run it from the build tree:
 
 ```bash
 mkdir -p build/renode && cd build/renode && renode-test ../../renode/oximeter.robot

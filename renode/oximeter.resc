@@ -3,8 +3,11 @@
 
 $bin?=$ORIGIN/../build/nrf52840dk/zephyr/zephyr.elf
 
+# The sensor model is compiled when it's loaded, so it has to come before the platform.
+include $ORIGIN/Max30101.cs
+
 mach create "oximeter"
-machine LoadPlatformDescription @platforms/boards/nrf52840dk_nrf52840.repl
+machine LoadPlatformDescription $ORIGIN/nrf52840dk-oximeter.repl
 
 showAnalyzer sysbus.uart0
 

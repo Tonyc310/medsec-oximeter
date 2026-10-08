@@ -1,0 +1,5 @@
+// The nRF52840 DK with a MAX30101 breakout on the Arduino header's I2C pins, INT on D2 (P1.03).
+using "platforms/boards/nrf52840dk_nrf52840.repl"
+
+max30101: Sensors.MAX30101 @ twi0 0x57
+    IRQ -> gpio1@3
