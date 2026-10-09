@@ -21,11 +21,9 @@
  * within this fraction of the highest is the beat, so a pulse isn't read as half its rate. */
 #define PEAK_TOLERANCE 0.9f
 
-#define MIN_PERIOD (60u * OXIMETRY_SAMPLE_RATE_HZ / OXIMETRY_MAX_PULSE_BPM)
 #define SAMPLES_PER_MINUTE (60.0f * (float)OXIMETRY_SAMPLE_RATE_HZ)
 
 _Static_assert(OXIMETRY_MAX_PERIOD < OXIMETRY_WINDOW_SAMPLES, "a beat fits in the window");
-_Static_assert(MIN_PERIOD >= 1u, "the analysis reads one sample before the shortest beat");
 
 typedef struct {
     int32_t mean;
@@ -80,19 +78,27 @@ static float correlation_at(const oximetry_t *oximetry, const channel_t *infrare
 static float beat_period(oximetry_t *oximetry, const channel_t *infrared)
 {
     float *const correlation = oximetry->correlation;
+    uint32_t first_negative = 0u;
     float highest = -1.0f;
 
-    for (uint32_t lag = MIN_PERIOD - 1u; lag <= OXIMETRY_MAX_PERIOD + 1u; lag++) {
+    for (uint32_t lag = 0u; lag <= OXIMETRY_MAX_PERIOD + 1u; lag++) {
         correlation[lag] = correlation_at(oximetry, infrared, lag);
-        if ((lag >= MIN_PERIOD) && (lag <= OXIMETRY_MAX_PERIOD) && (correlation[lag] > highest)) {
+        if ((first_negative == 0u) && (correlation[lag] < 0.0f)) {
+            first_negative = lag;
+        }
+        if ((first_negative != 0u) && (lag <= OXIMETRY_MAX_PERIOD) &&
+            (correlation[lag] > highest)) {
             highest = correlation[lag];
         }
     }
-    if (highest < MIN_PERIODICITY) {
+    if ((first_negative == 0u) || (highest < MIN_PERIODICITY)) {
         return 0.0f;
     }
 
-    for (uint32_t lag = MIN_PERIOD; lag <= OXIMETRY_MAX_PERIOD; lag++) {
+    /* Until the correlation first goes negative, within half a beat, the signal only matches
+     * itself for being smooth. Searching from there rather than from the shortest beat in range
+     * finds a faster pulse at its own period, not at twice it as half its rate. */
+    for (uint32_t lag = first_negative; lag <= OXIMETRY_MAX_PERIOD; lag++) {
         const float before = correlation[lag - 1u];
         const float peak = correlation[lag];
         const float after = correlation[lag + 1u];
@@ -129,6 +135,13 @@ static bool analyse(oximetry_t *oximetry, oximetry_reading_t *reading)
         return false;
     }
 
+    /* The search ends at the longest beat in range but finds shorter beats than the range allows,
+     * so only the fast end needs checking. */
+    const long pulse = lroundf(SAMPLES_PER_MINUTE / period);
+    if (pulse > (long)OXIMETRY_MAX_PULSE_BPM) {
+        return false;
+    }
+
     /* The ratio of ratios: the pulse in red light against the pulse in infrared, each relative to
      * its own level. Oxygenated blood absorbs less red, so the more oxygen, the smaller R. */
     const float ratio = sqrtf((float)red.squares / (float)infrared.squares) *
@@ -139,7 +152,7 @@ static bool analyse(oximetry_t *oximetry, oximetry_reading_t *reading)
     }
 
     reading->spo2_percent = (uint8_t)lroundf(fminf(spo2, MAX_SPO2));
-    reading->pulse_bpm = (uint16_t)lroundf(SAMPLES_PER_MINUTE / period);
+    reading->pulse_bpm = (uint16_t)pulse;
     return true;
 }
 

@@ -95,6 +95,25 @@ static void test_measures_pulse_rates_across_its_range(void)
     }
 }
 
+/* Rather than a wrong number: a pulse faster than the range must not be read at twice its period,
+ * as half its rate. */
+static void test_reports_nothing_for_a_pulse_outside_its_range(void)
+{
+    static const struct {
+        const char *name;
+        float bpm;
+    } rates[] = {{"29 bpm", 29.0f}, {"241 bpm", 241.0f}, {"300 bpm", 300.0f}};
+
+    for (size_t i = 0u; i < (sizeof rates / sizeof rates[0]); i++) {
+        patient_t patient = healthy;
+
+        patient.bpm = rates[i].bpm;
+        start();
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(1u, feed(&patient, SECONDS(4u)), rates[i].name);
+        TEST_ASSERT_FALSE_MESSAGE(reading.valid, rates[i].name);
+    }
+}
+
 static void test_measures_spo2_across_its_range(void)
 {
     static const struct {
@@ -159,6 +178,7 @@ int main(void)
     UNITY_BEGIN();
     RUN_TEST(test_reports_once_a_second_from_the_fourth_second);
     RUN_TEST(test_measures_pulse_rates_across_its_range);
+    RUN_TEST(test_reports_nothing_for_a_pulse_outside_its_range);
     RUN_TEST(test_measures_spo2_across_its_range);
     RUN_TEST(test_never_reports_spo2_above_100_percent);
     RUN_TEST(test_reports_nothing_for_a_pulse_too_weak_to_measure);

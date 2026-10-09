@@ -18,9 +18,9 @@ Renode has no model of the MAX30101, so [renode/Max30101.cs](renode/Max30101.cs)
 
 The analysis lives in [core/](core/), plain C17 with no Zephyr, so the same code runs in the firmware and in the unit tests on a PC. It keeps the last four seconds of samples and, once a second:
 
-- **Pulse rate**: compares the infrared signal with itself shifted by 0.25 to 2 seconds (autocorrelation, covering 240 down to 30 bpm) and takes the first shift where it repeats strongly. Taking the first rather than the strongest keeps a pulse from being read as half its rate.
+- **Pulse rate**: compares the infrared signal with itself shifted by up to 2 seconds (autocorrelation) and takes the first shift where it repeats strongly. Taking the first rather than the strongest keeps a pulse from being read as half its rate.
 - **SpO2**: oxygenated blood absorbs less red light than infrared, so the pulse shows weaker in red. The ratio of the two pulses, each against its own light level, gives SpO2 on a calibration line.
-- **No reading** when the pulse is too weak (under a 0.1% perfusion index) or has no steady rhythm: the device shows nothing rather than a wrong number.
+- **No reading** when the pulse is too weak (under a 0.1% perfusion index), has no steady rhythm, or is outside 30 to 240 bpm: the device shows nothing rather than a wrong number.
 
 The calibration line, SpO2 = 110 − 25 R, is the textbook one. A real oximeter's comes from a clinical study against arterial blood samples (ISO 80601-2-61), so these readings are illustrative.
 
