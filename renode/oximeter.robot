@@ -11,10 +11,11 @@ Start Board
     Create Terminal Tester    ${UART}
 
 *** Test Cases ***
-Reads Red And Infrared Light
+Reports SpO2 And Pulse Rate
     Start Board
-    # With the heartbeat switched off every sample is the steady level, so each second's mean is exact.
-    Execute Command           ${SENSOR} RedPulse 0
-    Execute Command           ${SENSOR} InfraredPulse 0
+    # 94% on the calibration line SpO2 = 110 - 25 R needs R of about 0.64: the red pulse, against
+    # its light level, about 0.64 times the infrared one (2000 on 130000). 1083 on 110000 is that.
+    Execute Command           ${SENSOR} HeartRate 90
+    Execute Command           ${SENSOR} RedPulse 1083
     Start Emulation
-    Wait For Line On Uart     ppg: red 110000, ir 130000
+    Wait For Line On Uart     SpO2 94%, pulse 90 bpm

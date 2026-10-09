@@ -1,3 +1,5 @@
+#include "oximetry.h"
+
 #include <zephyr/device.h>
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/logging/log.h>
@@ -8,20 +10,18 @@ LOG_MODULE_REGISTER(oximeter, LOG_LEVEL_INF);
 /* Samples per second reaching the FIFO: the sample rate after on-chip averaging. */
 #define SAMPLE_RATE_HZ (DT_PROP(SENSOR_NODE, smp_sr) / DT_PROP(SENSOR_NODE, smp_ave))
 
-static const struct device *const sensor = DEVICE_DT_GET(SENSOR_NODE);
+BUILD_ASSERT(SAMPLE_RATE_HZ == OXIMETRY_SAMPLE_RATE_HZ,
+             "the oximetry analysis expects the sensor at OXIMETRY_SAMPLE_RATE_HZ");
 
-/* One second of samples, summed to log the light level each LED sees. */
-static struct {
-    uint32_t count;
-    uint64_t red;
-    uint64_t infrared;
-} window;
+static const struct device *const sensor = DEVICE_DT_GET(SENSOR_NODE);
+static oximetry_t oximetry;
 
 /* Runs on the system work queue, once per sample, when the sensor's INT line falls. */
 static void on_sample(const struct device *dev, const struct sensor_trigger *trigger)
 {
     struct sensor_value red;
     struct sensor_value infrared;
+    oximetry_reading_t reading;
 
     ARG_UNUSED(trigger);
     if ((sensor_sample_fetch(dev) != 0) || (sensor_channel_get(dev, SENSOR_CHAN_RED, &red) != 0) ||
@@ -30,15 +30,19 @@ static void on_sample(const struct device *dev, const struct sensor_trigger *tri
         return;
     }
 
-    window.red += (uint32_t)red.val1;
-    window.infrared += (uint32_t)infrared.val1;
-    window.count++;
-    if (window.count == SAMPLE_RATE_HZ) {
-        LOG_INF("ppg: red %u, ir %u", (unsigned int)(window.red / window.count),
-                (unsigned int)(window.infrared / window.count));
-        window.count = 0;
-        window.red = 0;
-        window.infrared = 0;
+    /* The driver reports 18-bit counts, never negative. */
+    const oximetry_sample_t sample = {
+        .red = (uint32_t)red.val1,
+        .infrared = (uint32_t)infrared.val1,
+    };
+
+    if (!oximetry_add_sample(&oximetry, sample, &reading)) {
+        return;
+    }
+    if (reading.valid) {
+        LOG_INF("SpO2 %u%%, pulse %u bpm", reading.spo2_percent, reading.pulse_bpm);
+    } else {
+        LOG_INF("no pulse found");
     }
 }
 
@@ -54,6 +58,7 @@ int main(void)
         LOG_ERR("pulse oximetry sensor not found");
         return 0;
     }
+    oximetry_init(&oximetry);
     if (sensor_trigger_set(sensor, &data_ready, on_sample) != 0) {
         LOG_ERR("could not enable the sensor's data-ready interrupt");
     }

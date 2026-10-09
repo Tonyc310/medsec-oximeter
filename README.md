@@ -8,9 +8,19 @@ A Bluetooth pulse oximeter built to the security expectations FDA sets for conne
 
 ## Status
 
-Phase 2 of 7, the baseline device. The firmware reads red and infrared light from a MAX30101 pulse oximetry sensor; SpO2, heart rate and BLE come next. The baseline is built without security controls on purpose, so the threat model starts from an honest "before" state.
+Phase 2 of 7, the baseline device. Once a second the firmware reports SpO2 and pulse rate from a MAX30101 pulse oximetry sensor's red and infrared light; BLE comes next. The baseline is built without security controls on purpose, so the threat model starts from an honest "before" state.
 
 Renode has no model of the MAX30101, so [renode/Max30101.cs](renode/Max30101.cs) adds one: the registers Zephyr's driver uses, the 32-sample FIFO filled at the configured rate, the interrupt line, and a synthetic pulse waveform whose light level, pulse depth and heart rate a test can set.
+
+## How it measures
+
+The analysis lives in [core/](core/), plain C17 with no Zephyr, so the same code runs in the firmware and in the unit tests on a PC. It keeps the last four seconds of samples and, once a second:
+
+- **Pulse rate**: compares the infrared signal with itself shifted by 0.25 to 2 seconds (autocorrelation, covering 240 down to 30 bpm) and takes the first shift where it repeats strongly. Taking the first rather than the strongest keeps a pulse from being read as half its rate.
+- **SpO2**: oxygenated blood absorbs less red light than infrared, so the pulse shows weaker in red. The ratio of the two pulses, each against its own light level, gives SpO2 on a calibration line.
+- **No reading** when the pulse is too weak (under a 0.1% perfusion index) or has no steady rhythm: the device shows nothing rather than a wrong number.
+
+The calibration line, SpO2 = 110 − 25 R, is the textbook one. A real oximeter's comes from a clinical study against arterial blood samples (ISO 80601-2-61), so these readings are illustrative.
 
 ## Hardware
 
@@ -57,7 +67,7 @@ clang-tidy -p build/host core/src/*.c
 cppcheck --std=c11 --enable=warning,style,performance,portability -I core/include core/src
 ```
 
-The Robot Framework test boots the firmware in [Renode](https://renode.io) 1.17 with the sensor model and checks the light levels the firmware reports. It needs `renode-test` on `PATH` with its Python packages (`pip install -r <renode>/tests/requirements.txt`). It writes its report to the working directory, so run it from the build tree:
+The Robot Framework test boots the firmware in [Renode](https://renode.io) 1.17 with the sensor model set to a patient (90 bpm, 94%) and checks the firmware reports that. It needs `renode-test` on `PATH` with its Python packages (`pip install -r <renode>/tests/requirements.txt`). It writes its report to the working directory, so run it from the build tree:
 
 ```bash
 mkdir -p build/renode && cd build/renode && renode-test ../../renode/oximeter.robot
