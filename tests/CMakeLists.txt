@@ -13,3 +13,7 @@ add_test(NAME oximetry COMMAND test_oximetry)
 add_executable(test_plx test_plx.c)
 target_link_libraries(test_plx PRIVATE core unity project_warnings)
 add_test(NAME plx COMMAND test_plx)
+
+add_executable(test_alarm test_alarm.c)
+target_link_libraries(test_alarm PRIVATE core unity project_warnings)
+add_test(NAME alarm COMMAND test_alarm)
