@@ -8,7 +8,9 @@ A Bluetooth pulse oximeter built to the security expectations FDA sets for conne
 
 ## Status
 
-Phase 2 of 7, the baseline device, is complete. Once a second the firmware works out SpO2 and pulse rate from a MAX30101 pulse oximetry sensor's red and infrared light, sends them over Bluetooth LE to a hub, and raises alarms against limits the hub can set. The baseline is built without security controls on purpose, so the threat model starts from an honest "before" state. Phase 3, the architecture views and threat model, is next.
+Phase 2 of 7, the baseline device, is complete. Once a second the firmware works out SpO2 and pulse rate from a MAX30101 pulse oximetry sensor's red and infrared light, sends them over Bluetooth LE to a hub, and raises alarms against limits the hub can set. The baseline is built without security controls on purpose, so the threat model starts from an honest "before" state.
+
+Phase 3, the architecture views and threat model, is under way in [docs/security/](docs/security/), starting with the [system description](docs/security/system.md).
 
 Renode has no model of the MAX30101, so [renode/Max30101.cs](renode/Max30101.cs) adds one: the registers Zephyr's driver uses, the 32-sample FIFO filled at the configured rate, the interrupt line, and a synthetic pulse waveform whose light level, pulse depth and heart rate a test can set.
 
@@ -95,13 +97,14 @@ mkdir -p build/renode && cd build/renode && renode-test ../../renode/oximeter.ro
 ## Layout
 
 ```
-app/       the oximeter's Zephyr application: west.yml (the Zephyr pin), prj.conf, board overlay, src/
-hub/       the stand-in gateway's Zephyr application
-common/    Bluetooth definitions the two applications share
-core/      the oximetry analysis, the PLX encoding and the alarm checks: portable C17, no Zephyr
-tests/     Unity tests for core/, run on the host
-renode/    Renode platform, scripts, the MAX30101 model and the Robot tests
-deps/      Zephyr and its modules, fetched by west (git-ignored)
+app/            the oximeter's Zephyr application: west.yml (the Zephyr pin), prj.conf, board overlay, src/
+hub/            the stand-in gateway's Zephyr application
+common/         Bluetooth definitions the two applications share
+core/           the oximetry analysis, the PLX encoding and the alarm checks: portable C17, no Zephyr
+tests/          Unity tests for core/, run on the host
+renode/         Renode platform, scripts, the MAX30101 model and the Robot tests
+docs/security/  the cybersecurity documentation for a premarket submission
+deps/           Zephyr and its modules, fetched by west (git-ignored)
 ```
 
 ## License
