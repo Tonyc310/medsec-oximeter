@@ -1,18 +1,32 @@
 :name: medsec-oximeter
-:description: nRF52840 DK running the pulse oximeter firmware, with its console in a terminal window.
+:description: The pulse oximeter (nRF52840 DK with a MAX30101) and a hub on a second nRF52840, joined by Bluetooth LE.
 
-$bin?=$ORIGIN/../build/nrf52840dk/zephyr/zephyr.elf
+$oximeter_bin?=$ORIGIN/../build/oximeter/zephyr/zephyr.elf
+$hub_bin?=$ORIGIN/../build/hub/zephyr/zephyr.elf
 
 # The sensor model is compiled when it's loaded, so it has to come before the platform.
 include $ORIGIN/Max30101.cs
 
+emulation CreateBLEMedium "wireless"
+
 mach create "oximeter"
 machine LoadPlatformDescription $ORIGIN/nrf52840dk-oximeter.repl
-
+connector Connect sysbus.radio wireless
 showAnalyzer sysbus.uart0
+
+mach create "hub"
+machine LoadPlatformDescription @platforms/boards/nrf52840dk_nrf52840.repl
+connector Connect sysbus.radio wireless
+showAnalyzer sysbus.uart0
+
+# The two Bluetooth stacks need the machines kept within 10 us of each other.
+emulation SetGlobalQuantum "0.00001"
 
 macro reset
 """
-    sysbus LoadELF $bin
+    mach set "oximeter"
+    sysbus LoadELF $oximeter_bin
+    mach set "hub"
+    sysbus LoadELF $hub_bin
 """
 runMacro $reset

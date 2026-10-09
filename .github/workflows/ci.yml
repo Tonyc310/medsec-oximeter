@@ -13,7 +13,7 @@ jobs:
       - name: Check formatting
         run: >-
           pipx run clang-format==23.1.2 --dry-run --Werror
-          app/src/*.c core/include/*.h core/src/*.c tests/*.c
+          app/src/*.[ch] hub/src/*.c core/include/*.h core/src/*.c tests/*.c
 
   host:
     runs-on: ubuntu-24.04
@@ -55,8 +55,10 @@ jobs:
           app-path: app
           toolchains: arm-zephyr-eabi
 
-      - name: Build
-        run: west build -b nrf52840dk/nrf52840 -d build/nrf52840dk app
+      - name: Build the oximeter and the hub
+        run: |
+          west build -b nrf52840dk/nrf52840 -d build/oximeter app
+          west build -b nrf52840dk/nrf52840 -d build/hub hub
 
       - name: Install Renode
         run: |

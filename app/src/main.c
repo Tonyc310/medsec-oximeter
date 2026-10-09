@@ -1,4 +1,5 @@
 #include "oximetry.h"
+#include "plxs.h"
 
 #include <zephyr/device.h>
 #include <zephyr/drivers/sensor.h>
@@ -16,7 +17,7 @@ BUILD_ASSERT(SAMPLE_RATE_HZ == OXIMETRY_SAMPLE_RATE_HZ,
 static const struct device *const sensor = DEVICE_DT_GET(SENSOR_NODE);
 static oximetry_t oximetry;
 
-/* Runs on the system work queue, once per sample, when the sensor's INT line falls. */
+/* Runs on the sensor driver's thread, once per sample, when the sensor's INT line falls. */
 static void on_sample(const struct device *dev, const struct sensor_trigger *trigger)
 {
     struct sensor_value red;
@@ -44,6 +45,7 @@ static void on_sample(const struct device *dev, const struct sensor_trigger *tri
     } else {
         LOG_INF("no pulse found");
     }
+    plxs_send(&reading);
 }
 
 int main(void)
@@ -59,6 +61,10 @@ int main(void)
         return 0;
     }
     oximetry_init(&oximetry);
+    if (plxs_start() != 0) {
+        LOG_ERR("could not start Bluetooth");
+        return 0;
+    }
     if (sensor_trigger_set(sensor, &data_ready, on_sample) != 0) {
         LOG_ERR("could not enable the sensor's data-ready interrupt");
     }

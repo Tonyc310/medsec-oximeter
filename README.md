@@ -8,7 +8,7 @@ A Bluetooth pulse oximeter built to the security expectations FDA sets for conne
 
 ## Status
 
-Phase 2 of 7, the baseline device. Once a second the firmware reports SpO2 and pulse rate from a MAX30101 pulse oximetry sensor's red and infrared light; BLE comes next. The baseline is built without security controls on purpose, so the threat model starts from an honest "before" state.
+Phase 2 of 7, the baseline device. Once a second the firmware works out SpO2 and pulse rate from a MAX30101 pulse oximetry sensor's red and infrared light and sends them over Bluetooth LE to a hub; settable alarm limits come next. The baseline is built without security controls on purpose, so the threat model starts from an honest "before" state.
 
 Renode has no model of the MAX30101, so [renode/Max30101.cs](renode/Max30101.cs) adds one: the registers Zephyr's driver uses, the 32-sample FIFO filled at the configured rate, the interrupt line, and a synthetic pulse waveform whose light level, pulse depth and heart rate a test can set.
 
@@ -22,9 +22,17 @@ The analysis lives in [core/](core/), plain C17 with no Zephyr, so the same code
 
 The calibration line, SpO2 = 110 − 25 R, is the textbook one. A real oximeter's comes from a clinical study against arterial blood samples (ISO 80601-2-61), so these readings are illustrative.
 
+## Bluetooth
+
+The oximeter advertises the Bluetooth SIG **Pulse Oximeter Service** and sends a PLX Continuous Measurement notification once a second: SpO2 and pulse rate as IEEE 11073 SFLOATs, with the standard's "not a number" when there's no reading. Any central that knows the service can read it.
+
+[hub/](hub/) stands in for the bedside gateway until the Raspberry Pi version: a Zephyr app for a second nRF52840 that finds the oximeter, subscribes and logs each reading. Everything it receives goes through a strict decoder in `core/`, which rejects reserved flags, lengths that don't match the flags, and values out of range.
+
+The baseline link has no pairing or encryption, so anyone in range can connect and listen. That's where the threat model starts; Phase 4 adds the controls.
+
 ## Hardware
 
-An nRF52840 DK and a MAX30101 (or MAX30102) breakout, wired to the DK's Arduino header. Not yet tested on the real board.
+An nRF52840 DK and a MAX30101 (or MAX30102) breakout, wired to the DK's Arduino header. The hub runs on a second nRF52840 board, such as another DK or the nRF52840 Dongle; nRF Connect on a phone also shows the readings. Not yet tested on real boards.
 
 | Breakout | nRF52840 DK |
 |---|---|
@@ -53,8 +61,9 @@ Then, in each new shell:
 
 ```bash
 . .venv/bin/activate
-west build -b nrf52840dk/nrf52840 -d build/nrf52840dk app
-renode renode/oximeter.resc                # type `start`; the console opens in its own window
+west build -b nrf52840dk/nrf52840 -d build/oximeter app
+west build -b nrf52840dk/nrf52840 -d build/hub hub
+renode renode/oximeter.resc                # type `start`; each board's console opens in a window
 ```
 
 ## Test
@@ -67,7 +76,7 @@ clang-tidy -p build/host core/src/*.c
 cppcheck --std=c11 --enable=warning,style,performance,portability -I core/include core/src
 ```
 
-The Robot Framework test boots the firmware in [Renode](https://renode.io) 1.17 with the sensor model set to a patient (90 bpm, 94%) and checks the firmware reports that. It needs `renode-test` on `PATH` with its Python packages (`pip install -r <renode>/tests/requirements.txt`). It writes its report to the working directory, so run it from the build tree:
+The unit tests cover the oximetry analysis and the PLX encoder and decoder. The Robot Framework test boots both boards in [Renode](https://renode.io) 1.17, joined by a simulated Bluetooth link, with the sensor model set to a patient (90 bpm, 94%), and checks the hub receives that. It needs `renode-test` on `PATH` with its Python packages (`pip install -r <renode>/tests/requirements.txt`). It writes its report to the working directory, so run it from the build tree:
 
 ```bash
 mkdir -p build/renode && cd build/renode && renode-test ../../renode/oximeter.robot
@@ -76,8 +85,9 @@ mkdir -p build/renode && cd build/renode && renode-test ../../renode/oximeter.ro
 ## Layout
 
 ```
-app/       Zephyr application: west.yml (the Zephyr pin), prj.conf, board overlay, src/
-core/      the oximetry analysis: portable C17, no Zephyr
+app/       the oximeter's Zephyr application: west.yml (the Zephyr pin), prj.conf, board overlay, src/
+hub/       the stand-in gateway's Zephyr application
+core/      the oximetry analysis and the PLX encoding: portable C17, no Zephyr
 tests/     Unity tests for core/, run on the host
 renode/    Renode platform, scripts, the MAX30101 model and the Robot tests
 deps/      Zephyr and its modules, fetched by west (git-ignored)
