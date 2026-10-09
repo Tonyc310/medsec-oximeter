@@ -8,8 +8,9 @@ using Antmicro.Renode.Time;
 
 namespace Antmicro.Renode.Peripherals.Sensors
 {
-    // MAX30101 pulse oximetry and heart-rate sensor on I2C: the registers Zephyr's driver uses, a
-    // 32-sample FIFO filled at the configured rate, and the active-low INT pin.
+    // MAX30101 pulse oximetry and heart-rate sensor on I2C: the registers Zephyr's driver uses in
+    // SpO2 mode, a 32-sample FIFO filled at the configured rate, and the active-low INT pin.
+    // Anything else is logged as unmodeled.
     //
     // Each sample is a synthetic photoplethysmogram (PPG): the light that comes back through the
     // tissue (the level) minus a dip with every heartbeat, when arterial blood absorbs more of it
@@ -38,22 +39,15 @@ namespace Antmicro.Renode.Peripherals.Sensors
             address = 0;
             expectingAddress = true;
             fifoByte = 0;
-            interruptEnable1 = 0;
-            interruptEnable2 = 0;
-            almostFull = false;
+            interruptEnable = 0;
             sampleReady = false;
-            temperatureReady = false;
             writePointer = 0;
             readPointer = 0;
             unread = 0;
-            overflowCount = 0;
             fifoConfig = 0;
             modeConfig = 0;
             spo2Config = 0;
-            pilotAmplitude = 0;
-            proximityThreshold = 0;
             Array.Clear(ledAmplitude, 0, ledAmplitude.Length);
-            Array.Clear(multiLed, 0, multiLed.Length);
             sampleIndex = 0;
             // Power-on sets PWR_RDY, which can't be masked, so INT stays low until the status is
             // read. The reset bit goes through the same power-on reset, so it sets PWR_RDY too.
@@ -125,26 +119,13 @@ namespace Antmicro.Renode.Peripherals.Sensors
             switch((Register)register)
             {
             case Register.InterruptStatus1:
-                var status = (byte)((almostFull ? 0x80 : 0) | (sampleReady ? 0x40 : 0) | (powerReady ? 0x01 : 0));
-                // Reading a status register clears it and releases INT.
-                almostFull = sampleReady = powerReady = false;
+                var status = (byte)((sampleReady ? SampleReadyBit : 0) | (powerReady ? PowerReadyBit : 0));
+                // Reading the status clears it and releases INT.
+                sampleReady = powerReady = false;
                 UpdateInterrupt();
                 return status;
-            case Register.InterruptStatus2:
-                var temperature = (byte)(temperatureReady ? 0x02 : 0);
-                temperatureReady = false;
-                UpdateInterrupt();
-                return temperature;
             case Register.InterruptEnable1:
-                return interruptEnable1;
-            case Register.InterruptEnable2:
-                return interruptEnable2;
-            case Register.FifoWritePointer:
-                return writePointer;
-            case Register.OverflowCounter:
-                return overflowCount;
-            case Register.FifoReadPointer:
-                return readPointer;
+                return interruptEnable;
             case Register.FifoData:
                 return ReadFifoByte();
             case Register.FifoConfig:
@@ -158,22 +139,15 @@ namespace Antmicro.Renode.Peripherals.Sensors
             case Register.Led3Amplitude:
             case Register.Led4Amplitude:
                 return ledAmplitude[register - (byte)Register.Led1Amplitude];
-            case Register.MultiLed1:
-            case Register.MultiLed2:
-                return multiLed[register - (byte)Register.MultiLed1];
-            case Register.PilotAmplitude:
-                return pilotAmplitude;
-            case Register.ProximityThreshold:
-                return proximityThreshold;
-            case Register.DieTemperatureInteger:
-                return DieTemperature;
-            case Register.DieTemperatureFraction:
-            case Register.TemperatureConfig:
-                return 0;
-            case Register.RevisionId:
-                return RevisionId;
             case Register.PartId:
                 return PartId;
+            // Renode's TWI controller fetches the next byte as soon as one is taken, so reading one
+            // register also reads the one after it. These follow registers the driver reads; with die
+            // temperature and proximity sensing unused, they keep their reset value.
+            case Register.InterruptStatus2:
+            case Register.InterruptEnable2:
+            case Register.PilotAmplitude:
+                return 0;
             default:
                 this.Log(LogLevel.Warning, "Read from unmodeled register 0x{0:X2}", register);
                 return 0;
@@ -185,25 +159,14 @@ namespace Antmicro.Renode.Peripherals.Sensors
             switch((Register)register)
             {
             case Register.InterruptEnable1:
-                interruptEnable1 = (byte)(value & 0xE0);
+                interruptEnable = (byte)(value & 0xE0);
                 UpdateInterrupt();
-                break;
-            case Register.InterruptEnable2:
-                interruptEnable2 = (byte)(value & 0x02);
-                UpdateInterrupt();
-                break;
-            case Register.FifoWritePointer:
-                writePointer = (byte)(value & PointerMask);
-                unread = (writePointer - readPointer) & PointerMask;
-                break;
-            case Register.OverflowCounter:
-                overflowCount = (byte)(value & PointerMask);
-                break;
-            case Register.FifoReadPointer:
-                readPointer = (byte)(value & PointerMask);
-                unread = (writePointer - readPointer) & PointerMask;
                 break;
             case Register.FifoConfig:
+                if((value & RolloverBit) != 0)
+                {
+                    this.Log(LogLevel.Warning, "FIFO rollover isn't modeled: a full FIFO drops new samples");
+                }
                 fifoConfig = value;
                 Reconfigure();
                 break;
@@ -227,25 +190,6 @@ namespace Antmicro.Renode.Peripherals.Sensors
             case Register.Led4Amplitude:
                 ledAmplitude[register - (byte)Register.Led1Amplitude] = value;
                 break;
-            case Register.MultiLed1:
-            case Register.MultiLed2:
-                multiLed[register - (byte)Register.MultiLed1] = value;
-                break;
-            case Register.TemperatureConfig:
-                // A conversion finishes at once here; the die always reads DieTemperature.
-                if((value & 0x01) != 0)
-                {
-                    temperatureReady = true;
-                    UpdateInterrupt();
-                }
-                break;
-            // Proximity mode isn't modeled: these settings are kept, and have no effect.
-            case Register.PilotAmplitude:
-                pilotAmplitude = value;
-                break;
-            case Register.ProximityThreshold:
-                proximityThreshold = value;
-                break;
             default:
                 this.Log(LogLevel.Warning, "Write of 0x{0:X2} to unmodeled register 0x{1:X2}", value, register);
                 break;
@@ -268,35 +212,22 @@ namespace Antmicro.Renode.Peripherals.Sensors
 
         private void TakeSample()
         {
+            if(unread == FifoDepth)
+            {
+                // Without rollover, the driver's default, a full FIFO keeps its oldest samples.
+                return;
+            }
             var phase = (sampleIndex * HeartRate / 60.0 / sampler.Frequency) % 1.0;
             sampleIndex++;
             var beat = Heartbeat(phase);
-            var sample = new Sample
+            fifo[writePointer] = new Sample
             {
                 Red = Quantize(RedLevel - RedPulse * beat),
                 Infrared = Quantize(InfraredLevel - InfraredPulse * beat),
             };
-
-            if(unread == FifoDepth)
-            {
-                overflowCount = (byte)Math.Min(overflowCount + 1, PointerMask);
-                if((fifoConfig & RolloverBit) == 0)
-                {
-                    // Without rollover the FIFO keeps its oldest samples and drops new ones.
-                    return;
-                }
-                readPointer = (byte)((readPointer + 1) & PointerMask);
-                unread--;
-            }
-            fifo[writePointer] = sample;
-            writePointer = (byte)((writePointer + 1) & PointerMask);
+            writePointer = (writePointer + 1) % FifoDepth;
             unread++;
-
             sampleReady = true;
-            if(unread == FifoDepth - (fifoConfig & 0x0F))
-            {
-                almostFull = true;
-            }
             UpdateInterrupt();
         }
 
@@ -332,7 +263,7 @@ namespace Antmicro.Renode.Peripherals.Sensors
                 // An empty FIFO repeats its last sample without moving the read pointer.
                 if(unread > 0)
                 {
-                    readPointer = (byte)((readPointer + 1) & PointerMask);
+                    readPointer = (readPointer + 1) % FifoDepth;
                     unread--;
                 }
             }
@@ -341,10 +272,7 @@ namespace Antmicro.Renode.Peripherals.Sensors
 
         private void UpdateInterrupt()
         {
-            var pending = powerReady
-                || (almostFull && (interruptEnable1 & 0x80) != 0)
-                || (sampleReady && (interruptEnable1 & 0x40) != 0)
-                || (temperatureReady && (interruptEnable2 & 0x02) != 0);
+            var pending = powerReady || (sampleReady && (interruptEnable & SampleReadyBit) != 0);
             // Active low: the pin idles high and drops while an enabled interrupt is pending.
             IRQ.Set(!pending);
         }
@@ -352,30 +280,24 @@ namespace Antmicro.Renode.Peripherals.Sensors
         private byte address;
         private bool expectingAddress;
         private int fifoByte;
-        private byte interruptEnable1;
-        private byte interruptEnable2;
-        private bool almostFull;
+        private byte interruptEnable;
         private bool sampleReady;
-        private bool temperatureReady;
         private bool powerReady;
-        private byte writePointer;
-        private byte readPointer;
+        private int writePointer;
+        private int readPointer;
         private int unread;
-        private byte overflowCount;
         private byte fifoConfig;
         private byte modeConfig;
         private byte spo2Config;
-        private byte pilotAmplitude;
-        private byte proximityThreshold;
         private ulong sampleIndex;
 
         private readonly LimitTimer sampler;
         private readonly Sample[] fifo;
         private readonly byte[] ledAmplitude = new byte[4];
-        private readonly byte[] multiLed = new byte[2];
 
         private const int FifoDepth = 32;
-        private const byte PointerMask = 0x1F;
+        private const byte SampleReadyBit = 0x40;
+        private const byte PowerReadyBit = 0x01;
         private const byte ResetBit = 0x40;
         private const byte ShutdownBit = 0x80;
         private const byte RolloverBit = 0x10;
@@ -385,8 +307,6 @@ namespace Antmicro.Renode.Peripherals.Sensors
         private const int MultiLedMode = 0x07;
         private const double FullScale = (1 << 18) - 1;
         private const double SystolicPeak = 0.2;
-        private const byte DieTemperature = 31;
-        private const byte RevisionId = 0x03;
         private const byte PartId = 0x15;
 
         // SPO2_SR codes 0-7, in samples per second.
@@ -404,9 +324,6 @@ namespace Antmicro.Renode.Peripherals.Sensors
             InterruptStatus2 = 0x01,
             InterruptEnable1 = 0x02,
             InterruptEnable2 = 0x03,
-            FifoWritePointer = 0x04,
-            OverflowCounter = 0x05,
-            FifoReadPointer = 0x06,
             FifoData = 0x07,
             FifoConfig = 0x08,
             ModeConfig = 0x09,
@@ -416,13 +333,6 @@ namespace Antmicro.Renode.Peripherals.Sensors
             Led3Amplitude = 0x0E,
             Led4Amplitude = 0x0F,
             PilotAmplitude = 0x10,
-            MultiLed1 = 0x11,
-            MultiLed2 = 0x12,
-            DieTemperatureInteger = 0x1F,
-            DieTemperatureFraction = 0x20,
-            TemperatureConfig = 0x21,
-            ProximityThreshold = 0x30,
-            RevisionId = 0xFE,
             PartId = 0xFF,
         }
     }
