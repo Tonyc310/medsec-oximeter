@@ -11,7 +11,31 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Check formatting
-        run: pipx run clang-format==23.1.2 --dry-run --Werror app/src/*.c
+        run: >-
+          pipx run clang-format==23.1.2 --dry-run --Werror
+          app/src/*.c core/include/*.h core/src/*.c tests/*.c
+
+  host:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build clang-tidy cppcheck
+
+      - name: Unit tests (sanitized)
+        run: cmake --workflow --preset host
+
+      # CERT C checks, the static analyzer and bug-prone patterns, per .clang-tidy.
+      - name: clang-tidy
+        run: clang-tidy -p build/host core/src/*.c
+
+      - name: cppcheck
+        run: >-
+          cppcheck --std=c11 --enable=warning,style,performance,portability --inline-suppr
+          --error-exitcode=1 -q -I core/include core/src
 
   firmware:
     runs-on: ubuntu-24.04

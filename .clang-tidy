@@ -1,0 +1,8 @@
+# CERT C rules clang-tidy can check, its path-sensitive static analyzer, and bug-prone patterns.
+Checks: >
+  -*,
+  cert-*,
+  clang-analyzer-*,
+  bugprone-*
+WarningsAsErrors: '*'
+HeaderFilterRegex: 'core/'

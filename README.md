@@ -49,10 +49,28 @@ renode renode/oximeter.resc                # type `start`; the console opens in 
 
 ## Test
 
+The code is C17 written to SEI CERT C. The host build of `core/` runs its unit tests under AddressSanitizer and UndefinedBehaviorSanitizer with strict conversion warnings, then two static analyzers check it: clang-tidy (its CERT C checks, the Clang static analyzer and bug-prone patterns, per [.clang-tidy](.clang-tidy)) and cppcheck.
+
+```bash
+cmake --workflow --preset host                 # unit tests, sanitized
+clang-tidy -p build/host core/src/*.c
+cppcheck --std=c11 --enable=warning,style,performance,portability -I core/include core/src
+```
+
 The Robot Framework test boots the firmware in [Renode](https://renode.io) 1.17 with the sensor model and checks the light levels the firmware reports. It needs `renode-test` on `PATH` with its Python packages (`pip install -r <renode>/tests/requirements.txt`). It writes its report to the working directory, so run it from the build tree:
 
 ```bash
 mkdir -p build/renode && cd build/renode && renode-test ../../renode/oximeter.robot
+```
+
+## Layout
+
+```
+app/       Zephyr application: west.yml (the Zephyr pin), prj.conf, board overlay, src/
+core/      the oximetry analysis: portable C17, no Zephyr
+tests/     Unity tests for core/, run on the host
+renode/    Renode platform, scripts, the MAX30101 model and the Robot tests
+deps/      Zephyr and its modules, fetched by west (git-ignored)
 ```
 
 ## License
