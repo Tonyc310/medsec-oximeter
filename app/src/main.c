@@ -1,5 +1,5 @@
 #include "oximetry.h"
-#include "plxs.h"
+#include "plx_service.h"
 
 #include <zephyr/device.h>
 #include <zephyr/drivers/sensor.h>
@@ -45,7 +45,7 @@ static void on_sample(const struct device *dev, const struct sensor_trigger *tri
     } else {
         LOG_INF("no pulse found");
     }
-    plxs_send(&reading);
+    plx_service_send(&reading);
 }
 
 int main(void)
@@ -61,7 +61,7 @@ int main(void)
         return 0;
     }
     oximetry_init(&oximetry);
-    if (plxs_start() != 0) {
+    if (plx_service_start() != 0) {
         LOG_ERR("could not start Bluetooth");
         return 0;
     }

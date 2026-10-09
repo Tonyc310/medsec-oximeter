@@ -1,4 +1,4 @@
-#include "plxs.h"
+#include "plx_service.h"
 
 #include "plx.h"
 
@@ -9,7 +9,7 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_REGISTER(plxs, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(plx_service, LOG_LEVEL_INF);
 
 /* PLX Features: a 16-bit Supported Features field, none of the optional ones. */
 static const uint8_t features[] = {0x00, 0x00};
@@ -80,7 +80,7 @@ BT_CONN_CB_DEFINE(connection_callbacks) = {
     .recycled = on_recycled,
 };
 
-int plxs_start(void)
+int plx_service_start(void)
 {
     const int err = bt_enable(NULL);
 
@@ -91,7 +91,7 @@ int plxs_start(void)
     return 0;
 }
 
-void plxs_send(const oximetry_reading_t *reading)
+void plx_service_send(const oximetry_reading_t *reading)
 {
     uint8_t value[PLX_CONTINUOUS_SIZE];
 

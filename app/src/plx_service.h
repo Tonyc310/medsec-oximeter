@@ -1,12 +1,12 @@
-#ifndef PLXS_H
-#define PLXS_H
+#ifndef PLX_SERVICE_H
+#define PLX_SERVICE_H
 
 #include "oximetry.h"
 
 /** Starts Bluetooth and advertises the Pulse Oximeter Service; returns 0 or a negative errno. */
-int plxs_start(void);
+int plx_service_start(void);
 
 /** Sends a reading to every central subscribed to Continuous Measurement notifications. */
-void plxs_send(const oximetry_reading_t *reading);
+void plx_service_send(const oximetry_reading_t *reading);
 
 #endif
