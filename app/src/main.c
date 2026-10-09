@@ -1,3 +1,4 @@
+#include "alarm_service.h"
 #include "oximetry.h"
 #include "plx_service.h"
 
@@ -46,6 +47,7 @@ static void on_sample(const struct device *dev, const struct sensor_trigger *tri
         LOG_INF("no pulse found");
     }
     plx_service_send(&reading);
+    alarm_service_update(&reading);
 }
 
 int main(void)
@@ -61,6 +63,10 @@ int main(void)
         return 0;
     }
     oximetry_init(&oximetry);
+    if (alarm_service_init() != 0) {
+        LOG_ERR("could not set up the alarm LED");
+        return 0;
+    }
     if (plx_service_start() != 0) {
         LOG_ERR("could not start Bluetooth");
         return 0;

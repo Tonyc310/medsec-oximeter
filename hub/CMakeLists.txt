@@ -4,5 +4,5 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(medsec_hub LANGUAGES C)
 
 set(CORE ${CMAKE_CURRENT_SOURCE_DIR}/../core)
-target_sources(app PRIVATE src/main.c ${CORE}/src/plx.c)
-target_include_directories(app PRIVATE ${CORE}/include)
+target_sources(app PRIVATE src/main.c ${CORE}/src/alarm.c ${CORE}/src/plx.c)
+target_include_directories(app PRIVATE ${CORE}/include ${CMAKE_CURRENT_SOURCE_DIR}/../common/include)

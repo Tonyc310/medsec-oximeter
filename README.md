@@ -8,7 +8,7 @@ A Bluetooth pulse oximeter built to the security expectations FDA sets for conne
 
 ## Status
 
-Phase 2 of 7, the baseline device. Once a second the firmware works out SpO2 and pulse rate from a MAX30101 pulse oximetry sensor's red and infrared light and sends them over Bluetooth LE to a hub; settable alarm limits come next. The baseline is built without security controls on purpose, so the threat model starts from an honest "before" state.
+Phase 2 of 7, the baseline device, is complete. Once a second the firmware works out SpO2 and pulse rate from a MAX30101 pulse oximetry sensor's red and infrared light, sends them over Bluetooth LE to a hub, and raises alarms against limits the hub can set. The baseline is built without security controls on purpose, so the threat model starts from an honest "before" state. Phase 3, the architecture views and threat model, is next.
 
 Renode has no model of the MAX30101, so [renode/Max30101.cs](renode/Max30101.cs) adds one: the registers Zephyr's driver uses, the 32-sample FIFO filled at the configured rate, the interrupt line, and a synthetic pulse waveform whose light level, pulse depth and heart rate a test can set.
 
@@ -29,6 +29,14 @@ The oximeter advertises the Bluetooth SIG **Pulse Oximeter Service** and sends a
 [hub/](hub/) stands in for the bedside gateway until the Raspberry Pi version: a Zephyr app for a second nRF52840 that finds the oximeter, subscribes and logs each reading. Everything it receives goes through a strict decoder in `core/`, which rejects reserved flags, lengths that don't match the flags, and values out of range.
 
 The baseline link has no pairing or encryption, so anyone in range can connect and listen. That's where the threat model starts; Phase 4 adds the controls.
+
+## Alarms
+
+The oximeter alarms when SpO2 falls below its limit or the pulse rate leaves its range (by default under 90%, or under 50 or over 120 bpm), and raises a technical alarm when it finds no pulse. An alarm lights LED1 on the DK and is sent to the hub as a notification.
+
+The limits are a read-write characteristic in a second, vendor-specific service. The hub sets them from its shell, the way a clinician would at a central station: `limits 95 50 120`. The oximeter refuses settings a monitor wouldn't offer, such as an SpO2 limit of 100% or a low pulse limit above the high one, and keeps the last accepted ones.
+
+Range checks keep out nonsense, not malice. A 50% SpO2 limit is a legitimate setting, and it also silences a hypoxia alarm. In the baseline any device in range can write it, which makes this write the threat model's central case. Two simplifications a real monitor wouldn't make: there's no alarm delay to avoid nuisance alarms (IEC 60601-1-8), and the limits return to the defaults at power-up.
 
 ## Hardware
 
@@ -66,6 +74,8 @@ west build -b nrf52840dk/nrf52840 -d build/hub hub
 renode renode/oximeter.resc                # type `start`; each board's console opens in a window
 ```
 
+In the hub's window, `limits <SpO2 low %> <pulse low bpm> <pulse high bpm>` sets the oximeter's alarm limits. In Renode's monitor, `mach set "oximeter"` then `sysbus.twi0.max30101 HeartRate 130` (or `RedPulse`, `InfraredPulse`, `RedLevel`, `InfraredLevel`) changes the simulated patient.
+
 ## Test
 
 The code is C17 written to SEI CERT C. The host build of `core/` runs its unit tests under AddressSanitizer and UndefinedBehaviorSanitizer with strict conversion warnings, then two static analyzers check it: clang-tidy (its CERT C checks, the Clang static analyzer and bug-prone patterns, per [.clang-tidy](.clang-tidy)) and cppcheck.
@@ -76,7 +86,7 @@ clang-tidy -p build/host core/src/*.c
 cppcheck --std=c11 --enable=warning,style,performance,portability -I core/include core/src
 ```
 
-The unit tests cover the oximetry analysis and the PLX encoder and decoder. The Robot Framework test boots both boards in [Renode](https://renode.io) 1.17, joined by a simulated Bluetooth link, with the sensor model set to a patient (90 bpm, 94%), and checks the hub receives that. It needs `renode-test` on `PATH` with its Python packages (`pip install -r <renode>/tests/requirements.txt`). It writes its report to the working directory, so run it from the build tree:
+The unit tests cover the oximetry analysis, the PLX encoder and decoder, and the alarm checks and limit settings. The Robot Framework test boots both boards in [Renode](https://renode.io) 1.17, joined by a simulated Bluetooth link, with the sensor model set to a patient (90 bpm, 94%). It checks the hub receives that reading and the alarm LED stays off, then sets a 95% limit from the hub's shell and checks the oximeter accepts it, alarms, and lights the LED. It needs `renode-test` on `PATH` with its Python packages (`pip install -r <renode>/tests/requirements.txt`). It writes its report to the working directory, so run it from the build tree:
 
 ```bash
 mkdir -p build/renode && cd build/renode && renode-test ../../renode/oximeter.robot
@@ -87,7 +97,8 @@ mkdir -p build/renode && cd build/renode && renode-test ../../renode/oximeter.ro
 ```
 app/       the oximeter's Zephyr application: west.yml (the Zephyr pin), prj.conf, board overlay, src/
 hub/       the stand-in gateway's Zephyr application
-core/      the oximetry analysis and the PLX encoding: portable C17, no Zephyr
+common/    Bluetooth definitions the two applications share
+core/      the oximetry analysis, the PLX encoding and the alarm checks: portable C17, no Zephyr
 tests/     Unity tests for core/, run on the host
 renode/    Renode platform, scripts, the MAX30101 model and the Robot tests
 deps/      Zephyr and its modules, fetched by west (git-ignored)

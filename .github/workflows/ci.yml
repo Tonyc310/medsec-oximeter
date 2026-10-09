@@ -13,7 +13,7 @@ jobs:
       - name: Check formatting
         run: >-
           pipx run clang-format==23.1.2 --dry-run --Werror
-          app/src/*.[ch] hub/src/*.c core/include/*.h core/src/*.c tests/*.c
+          app/src/*.[ch] hub/src/*.c common/include/*.h core/include/*.h core/src/*.c tests/*.c
 
   host:
     runs-on: ubuntu-24.04
