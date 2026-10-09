@@ -15,12 +15,10 @@
 LOG_MODULE_REGISTER(hub, LOG_LEVEL_INF);
 
 /* A stand-in for the bedside gateway: it finds a pulse oximeter, logs its readings and alarms,
- * and sets its alarm limits from the shell. Like the oximeter's baseline, it uses no pairing or
- * encryption yet. */
+ * and sets its alarm limits from the shell. */
 
-/* Discovery keeps a pointer to the UUID it compares against until it finishes, after the call
- * that started it has returned. The BT_UUID_* macros make temporaries, so these live at file
- * scope. */
+/* Discovery reads its UUID after the call that starts it has returned, and the BT_UUID_* macros
+ * make temporaries, so these live at file scope. */
 static const struct bt_uuid_16 continuous_measurement = BT_UUID_INIT_16(BT_UUID_GATT_PLX_CM_VAL);
 static const struct bt_uuid_128 alarm_limits = BT_UUID_INIT_128(MEDSEC_ALARM_LIMITS_VAL);
 static const struct bt_uuid_128 alarm_state = BT_UUID_INIT_128(MEDSEC_ALARM_STATE_VAL);
@@ -140,8 +138,6 @@ static uint8_t on_characteristic(struct bt_conn *conn, const struct bt_gatt_attr
         limits_handle = characteristic->value_handle;
     } else if (bt_uuid_cmp(characteristic->uuid, &alarm_state.uuid) == 0) {
         state_handle = characteristic->value_handle;
-    } else {
-        /* Not one the hub uses. */
     }
     return BT_GATT_ITER_CONTINUE;
 }

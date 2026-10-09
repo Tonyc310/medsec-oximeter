@@ -67,9 +67,7 @@ static ssize_t read_state(struct bt_conn *conn, const struct bt_gatt_attr *attr,
     return bt_gatt_attr_read(conn, attr, buf, len, offset, &value, sizeof value);
 }
 
-/* Like the readings, the baseline leaves this open: any device in range can change the limits,
- * and a lower SpO2 limit silences a hypoxia alarm. That's the threat the security work starts from.
- */
+/* Open in the baseline: any device in range can change the limits (threats T-01 to T-03). */
 BT_GATT_SERVICE_DEFINE(
     alarm_service, BT_GATT_PRIMARY_SERVICE(&service_uuid),
     BT_GATT_CHARACTERISTIC(&limits_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,

@@ -30,7 +30,7 @@ The oximeter advertises the Bluetooth SIG **Pulse Oximeter Service** and sends a
 
 [hub/](hub/) stands in for the bedside gateway until the Raspberry Pi version: a Zephyr app for a second nRF52840 that finds the oximeter, subscribes and logs each reading. Everything it receives goes through a strict decoder in `core/`, which rejects reserved flags, lengths that don't match the flags, and values out of range.
 
-The baseline link has no pairing or encryption, so anyone in range can connect and listen. That's where the threat model starts; Phase 4 adds the controls.
+The baseline link has no pairing or encryption, so anyone in range can connect and listen.
 
 ## Alarms
 
@@ -102,7 +102,7 @@ hub/            the stand-in gateway's Zephyr application
 common/         Bluetooth definitions the two applications share
 core/           the oximetry analysis, the PLX encoding and the alarm checks: portable C17, no Zephyr
 tests/          Unity tests for core/, run on the host
-renode/         Renode platform, scripts, the MAX30101 model and the Robot tests
+renode/         Renode platform, scripts, the MAX30101 model and the Robot test
 docs/security/  the cybersecurity documentation for a premarket submission
 deps/           Zephyr and its modules, fetched by west (git-ignored)
 ```

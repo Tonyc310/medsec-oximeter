@@ -13,9 +13,6 @@
 /* Flags, SpO2 and pulse rate: the fields every Continuous Measurement carries. */
 #define PLX_CONTINUOUS_SIZE 5u
 
-/* With every optional field present. */
-#define PLX_CONTINUOUS_MAX_SIZE 20u
-
 /** Encodes a reading with no optional fields; no reading is sent as SFLOAT "not a number". */
 void plx_encode_continuous(const oximetry_reading_t *reading, uint8_t out[PLX_CONTINUOUS_SIZE]);
 

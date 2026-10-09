@@ -20,8 +20,7 @@ static ssize_t read_features(struct bt_conn *conn, const struct bt_gatt_attr *at
     return bt_gatt_attr_read(conn, attr, buf, len, offset, features, sizeof features);
 }
 
-/* The baseline is deliberately open: no pairing, no encryption, so anyone in range can connect
- * and listen. The threat model starts from here; Phase 4 adds the controls. */
+/* Open in the baseline: anyone in range can connect and listen (threats T-07, T-08). */
 BT_GATT_SERVICE_DEFINE(pulse_oximeter_service, BT_GATT_PRIMARY_SERVICE(BT_UUID_POS),
                        BT_GATT_CHARACTERISTIC(BT_UUID_GATT_PLX_CM, BT_GATT_CHRC_NOTIFY,
                                               BT_GATT_PERM_NONE, NULL, NULL, NULL),

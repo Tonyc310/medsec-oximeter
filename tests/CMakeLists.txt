@@ -6,14 +6,8 @@ FetchContent_Declare(unity
     SYSTEM)
 FetchContent_MakeAvailable(unity)
 
-add_executable(test_oximetry test_oximetry.c)
-target_link_libraries(test_oximetry PRIVATE core unity project_warnings)
-add_test(NAME oximetry COMMAND test_oximetry)
-
-add_executable(test_plx test_plx.c)
-target_link_libraries(test_plx PRIVATE core unity project_warnings)
-add_test(NAME plx COMMAND test_plx)
-
-add_executable(test_alarm test_alarm.c)
-target_link_libraries(test_alarm PRIVATE core unity project_warnings)
-add_test(NAME alarm COMMAND test_alarm)
+foreach(module alarm oximetry plx)
+    add_executable(test_${module} test_${module}.c)
+    target_link_libraries(test_${module} PRIVATE core unity project_warnings)
+    add_test(NAME ${module} COMMAND test_${module})
+endforeach()
