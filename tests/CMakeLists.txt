@@ -9,3 +9,7 @@ FetchContent_MakeAvailable(unity)
 add_executable(test_oximetry test_oximetry.c)
 target_link_libraries(test_oximetry PRIVATE core unity project_warnings)
 add_test(NAME oximetry COMMAND test_oximetry)
+
+add_executable(test_plx test_plx.c)
+target_link_libraries(test_plx PRIVATE core unity project_warnings)
+add_test(NAME plx COMMAND test_plx)
