@@ -7,7 +7,7 @@ The cybersecurity documentation FDA's premarket guidance (February 2026 edition)
 | Document | Covers | Submission item | Status |
 |---|---|---|---|
 | [System description](system.md) | intended use, use environments, elements, interfaces, assets, adversaries, trust boundaries, global system view | architecture: global system view; the threat model's inputs | draft |
-| Threat model | data flows, and STRIDE threats for every element and flow | threat model | Phase 3 |
+| [Threat model](threat-model.md) | data flows, and STRIDE threats for every element and flow | threat model | draft |
 | Attack trees | the top threats in depth | threat model | Phase 3 |
 | Architecture views | multi-patient harm, updatability and patchability, security use cases | architecture views | Phase 3 |
 | Risk assessment | each threat's exploitability (MITRE's CVSS rubric for medical devices) and severity of patient harm, before and after controls | cybersecurity risk assessment | Phases 3 and 4 |

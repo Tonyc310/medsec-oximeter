@@ -10,7 +10,7 @@ A Bluetooth pulse oximeter built to the security expectations FDA sets for conne
 
 Phase 2 of 7, the baseline device, is complete. Once a second the firmware works out SpO2 and pulse rate from a MAX30101 pulse oximetry sensor's red and infrared light, sends them over Bluetooth LE to a hub, and raises alarms against limits the hub can set. The baseline is built without security controls on purpose, so the threat model starts from an honest "before" state.
 
-Phase 3, the architecture views and threat model, is under way in [docs/security/](docs/security/), starting with the [system description](docs/security/system.md).
+Phase 3, the architecture views and threat model, is under way in [docs/security/](docs/security/): so far the [system description](docs/security/system.md) and the [threat model](docs/security/threat-model.md).
 
 Renode has no model of the MAX30101, so [renode/Max30101.cs](renode/Max30101.cs) adds one: the registers Zephyr's driver uses, the 32-sample FIFO filled at the configured rate, the interrupt line, and a synthetic pulse waveform whose light level, pulse depth and heart rate a test can set.
 
