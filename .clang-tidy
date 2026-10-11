@@ -1,8 +1,13 @@
 # CERT C rules clang-tidy can check, its path-sensitive static analyzer, and bug-prone patterns.
+# One analyzer check is off: it flags calls such as memcpy and memset in favour of C11's optional
+# Annex K functions (memcpy_s and the like). glibc, which the host tests build against, has none of
+# them, so portable code can't use them. core/'s buffers have fixed sizes, and the unit tests run
+# under AddressSanitizer.
 Checks: >
   -*,
   cert-*,
   clang-analyzer-*,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
   bugprone-*
 WarningsAsErrors: '*'
 HeaderFilterRegex: 'core/'
