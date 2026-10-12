@@ -3,3 +3,18 @@ using "platforms/boards/nrf52840dk_nrf52840.repl"
 
 max30101: Sensors.MAX30101 @ twi0 0x57
     IRQ -> gpio1@3
+
+// Renode has no model of the flash controller: Nvmc.cs adds one.
+nvmc: Miscellaneous.NRF52840_NVMC @ sysbus 0x4001E000
+    flash: flash
+
+// The flash geometry Zephyr's driver reads from FICR, which Renode leaves at zero: 256 pages of
+// 4 KB. A new chip's flash is erased, all ones.
+sysbus:
+    init add:
+        Tag <0x10000010, 0x10000013> "CODEPAGESIZE" 0x1000
+        Tag <0x10000014, 0x10000017> "CODESIZE" 0x100
+
+flash:
+    init:
+        ResetByte 0xFF

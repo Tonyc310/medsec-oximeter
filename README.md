@@ -14,7 +14,7 @@ Phase 3, the architecture views and threat model, is under way in [docs/security
 
 Phase 4, the security controls, has started with the threat model's central case: a change of alarm limits must now be signed (see [Alarms](#alarms)).
 
-Renode has no model of the MAX30101, so [renode/Max30101.cs](renode/Max30101.cs) adds one: the registers Zephyr's driver uses, the 32-sample FIFO filled at the configured rate, the interrupt line, and a synthetic pulse waveform whose light level, pulse depth and heart rate a test can set.
+Renode has no model of the MAX30101, so [renode/Max30101.cs](renode/Max30101.cs) adds one: the registers Zephyr's driver uses, the 32-sample FIFO filled at the configured rate, the interrupt line, and a synthetic pulse waveform whose light level, pulse depth and heart rate a test can set. Nor does it model the nRF52840's flash controller, which keeping anything in flash needs: [renode/Nvmc.cs](renode/Nvmc.cs) erases flash pages, and Zephyr's own flash driver tests check it.
 
 ## How it measures
 
@@ -108,6 +108,13 @@ west build -b nrf52840dk/nrf52840 -d build/hub-other-key hub -- -DLIMITS_KEY_FIL
 mkdir -p build/renode && cd build/renode && renode-test ../../renode/oximeter.robot
 ```
 
+A third runs Zephyr's own flash driver tests (`tests/drivers/flash/common`) on the oximeter's platform, which checks the flash controller model through the real driver:
+
+```bash
+west build -b nrf52840dk/nrf52840 -d build/flash-test deps/zephyr/tests/drivers/flash/common -- -DCONFIG_TEST_FORCE_STORAGE_PARTITION=y
+cd build/renode && renode-test ../../renode/flash.robot
+```
+
 ## Layout
 
 ```
@@ -116,7 +123,7 @@ hub/            the stand-in gateway's Zephyr application, and tests for its sig
 common/         what the two applications share: Bluetooth and crypto definitions, crypto settings
 core/           the oximetry analysis, the PLX encoding, the alarm checks and signed limit changes: portable C17, no Zephyr
 tests/          Unity tests for core/, run on the host
-renode/         Renode platform, scripts, the MAX30101 model and the Robot test
+renode/         Renode platform, scripts, the MAX30101 and flash controller models, and the Robot tests
 docs/security/  the cybersecurity documentation for a premarket submission
 deps/           Zephyr and its modules, fetched by west (git-ignored)
 ```

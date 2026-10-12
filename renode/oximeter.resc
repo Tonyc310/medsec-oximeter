@@ -4,8 +4,9 @@
 $oximeter_bin?=$ORIGIN/../build/oximeter/zephyr/zephyr.elf
 $hub_bin?=$ORIGIN/../build/hub/zephyr/zephyr.elf
 
-# The sensor model is compiled when it's loaded, so it has to come before the platform.
+# The models are compiled when they're loaded, so they have to come before the platform.
 include $ORIGIN/Max30101.cs
+include $ORIGIN/Nvmc.cs
 
 emulation CreateBLEMedium "wireless"
 

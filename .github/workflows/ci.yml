@@ -65,12 +65,15 @@ jobs:
           build/limits_signer/zephyr/zephyr.exe
 
       # The second hub has a key of its own, for the test that a stranger's change is refused.
-      - name: Build the oximeter and the hubs
+      # Zephyr's flash driver tests, on the internal flash, check the flash controller model.
+      - name: Build the firmware
         run: |
           west build -b nrf52840dk/nrf52840 -d build/oximeter app
           west build -b nrf52840dk/nrf52840 -d build/hub hub
           west build -b nrf52840dk/nrf52840 -d build/hub-other-key hub -- \
             -DLIMITS_KEY_FILE=$PWD/build/other-limits.key
+          west build -b nrf52840dk/nrf52840 -d build/flash-test deps/zephyr/tests/drivers/flash/common \
+            -- -DCONFIG_TEST_FORCE_STORAGE_PARTITION=y
 
       - name: Install Renode
         run: |
@@ -84,7 +87,7 @@ jobs:
       - name: Renode tests
         run: |
           mkdir -p build/renode && cd build/renode
-          renode-test ../../renode/oximeter.robot
+          renode-test ../../renode/oximeter.robot ../../renode/flash.robot
 
       - name: Upload Renode results
         if: failure()
