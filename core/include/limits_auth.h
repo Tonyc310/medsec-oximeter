@@ -13,6 +13,7 @@
 #define LIMITS_AUTH_CHALLENGE_SIZE 16u
 #define LIMITS_AUTH_TAG_SIZE 16u
 #define LIMITS_AUTH_COMMAND_SIZE (ALARM_LIMITS_SIZE + LIMITS_AUTH_TAG_SIZE)
+#define LIMITS_AUTH_MESSAGE_SIZE (LIMITS_AUTH_CHALLENGE_SIZE + ALARM_LIMITS_SIZE)
 
 typedef struct {
     /** Fills `out` from a cryptographically secure source; false if it can't. */
@@ -27,6 +28,13 @@ typedef struct {
     uint8_t challenge[LIMITS_AUTH_CHALLENGE_SIZE];
     bool fresh; /* false when the random source failed: the old challenge mustn't be reused */
 } limits_auth_t;
+
+/**
+ * The bytes a tag covers: the challenge, then the limits as alarm_limits_encode sends them. The
+ * oximeter and whatever signs its commands both build them here, so they can't disagree.
+ */
+void limits_auth_message(const uint8_t challenge[LIMITS_AUTH_CHALLENGE_SIZE],
+                         const alarm_limits_t *limits, uint8_t message[LIMITS_AUTH_MESSAGE_SIZE]);
 
 /** Issues the first challenge. `crypto` must outlive `auth`. */
 void limits_auth_init(limits_auth_t *auth, const limits_auth_crypto_t *crypto);
