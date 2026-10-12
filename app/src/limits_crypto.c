@@ -1,8 +1,8 @@
 #include "limits_crypto.h"
 
-#include <psa/crypto.h>
+#include "medsec_crypto.h"
 
-#define ALGORITHM PSA_ALG_TRUNCATED_MAC(PSA_ALG_HMAC(PSA_ALG_SHA_256), LIMITS_AUTH_TAG_SIZE)
+#include <psa/crypto.h>
 
 static psa_key_id_t key_id = PSA_KEY_ID_NULL;
 
@@ -20,7 +20,7 @@ bool limits_crypto_init(const uint8_t *key, size_t length)
     psa_set_key_type(&attributes, PSA_KEY_TYPE_HMAC);
     /* The oximeter only checks tags; it never makes them. */
     psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_VERIFY_MESSAGE);
-    psa_set_key_algorithm(&attributes, ALGORITHM);
+    psa_set_key_algorithm(&attributes, MEDSEC_LIMITS_MAC);
     return psa_import_key(&attributes, key, length, &key_id) == PSA_SUCCESS;
 }
 
@@ -32,7 +32,7 @@ static bool random_bytes(uint8_t *out, size_t length)
 /* psa_mac_verify compares in constant time, so a tag can't be guessed a byte at a time. */
 static bool verify(const uint8_t *message, size_t length, const uint8_t *tag)
 {
-    return psa_mac_verify(key_id, ALGORITHM, message, length, tag, LIMITS_AUTH_TAG_SIZE) ==
+    return psa_mac_verify(key_id, MEDSEC_LIMITS_MAC, message, length, tag, LIMITS_AUTH_TAG_SIZE) ==
            PSA_SUCCESS;
 }
 
