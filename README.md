@@ -42,7 +42,7 @@ The limits are a characteristic in a second, vendor-specific service. The hub se
 
 Range checks keep out nonsense, not malice: a 50% SpO2 limit is a legitimate setting, and it also silences a hypoxia alarm. So a change has to be signed. The oximeter offers a random 16-byte challenge, replaced after every attempt and on every connection. A change is the limits followed by a tag over the challenge and the limits: HMAC-SHA256 cut to 128 bits ([core/src/limits_auth.c](core/src/limits_auth.c)). Only a holder of the key can make the tag, and each tag works once. The hub signs the way the monitoring backend will. Until devices get keys of their own, a later Phase 4 control, both builds share a key that the first build generates into `build/limits.key`, which is never committed.
 
-Two simplifications a real monitor wouldn't make: there's no alarm delay to avoid nuisance alarms (IEC 60601-1-8), and the limits return to the defaults at power-up.
+Accepted limits are kept in flash (Zephyr's settings, on NVS), so a reset doesn't quietly bring back the defaults. A change the oximeter can't save is refused rather than applied until the next reset, so the clinician knows it didn't take. One simplification a real monitor wouldn't make: there's no alarm delay to avoid nuisance alarms (IEC 60601-1-8).
 
 ## Hardware
 
@@ -103,14 +103,14 @@ west build -b native_sim/native/64 -d build/limits_store app/tests/limits_store
 build/limits_store/zephyr/zephyr.exe
 ```
 
-The Robot Framework tests boot both boards in [Renode](https://renode.io) 1.17, joined by a simulated Bluetooth link, with the sensor model set to a patient (90 bpm, 94%). The first checks the hub receives that reading and the alarm LED stays off, then sets a 95% limit from the hub's shell and checks the oximeter accepts the signed change, alarms, and lights the LED. The second runs the same hub built with a key of its own, as a gateway that wasn't given this oximeter's key, and checks the oximeter refuses its change and keeps monitoring under the old limits. They need `renode-test` on `PATH` with its Python packages (`pip install -r <renode>/tests/requirements.txt`), and write their report to the working directory, so run them from the build tree:
+The Robot Framework tests boot both boards in [Renode](https://renode.io) 1.17, joined by a simulated Bluetooth link, with the sensor model set to a patient (90 bpm, 94%). The first checks the hub receives that reading and the alarm LED stays off, then sets a 95% limit from the hub's shell and checks the oximeter accepts the signed change, alarms, and lights the LED. The second runs the same hub built with a key of its own, as a gateway that wasn't given this oximeter's key, and checks the oximeter refuses its change and keeps monitoring under the old limits. The third sets the limits, resets the oximeter, and checks it starts with them and alarms again. They need `renode-test` on `PATH` with its Python packages (`pip install -r <renode>/tests/requirements.txt`), and write their report to the working directory, so run them from the build tree:
 
 ```bash
 west build -b nrf52840dk/nrf52840 -d build/hub-other-key hub -- -DLIMITS_KEY_FILE=$PWD/build/other-limits.key
 mkdir -p build/renode && cd build/renode && renode-test ../../renode/oximeter.robot
 ```
 
-A third runs Zephyr's own flash driver tests (`tests/drivers/flash/common`) on the oximeter's platform, which checks the flash controller model through the real driver:
+Another runs Zephyr's own flash driver tests (`tests/drivers/flash/common`) on the oximeter's platform, which checks the flash controller model through the real driver:
 
 ```bash
 west build -b nrf52840dk/nrf52840 -d build/flash-test deps/zephyr/tests/drivers/flash/common -- -DCONFIG_TEST_FORCE_STORAGE_PARTITION=y

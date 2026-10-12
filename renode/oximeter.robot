@@ -52,3 +52,19 @@ Refuses Limits From A Hub Without Its Key
     # Monitoring goes on under the old limits: the next reading raises no alarm.
     Wait For Line On Uart     hub: SpO2 94%    testerId=${hub}
     Assert LED State          false
+
+Keeps The Clinician's Limits Through A Reset
+    Start System
+    Monitor A Patient At 94 Percent
+    Write Line To Uart        limits 95 50 120    testerId=${hub}
+    Wait For Line On Uart     oximeter accepted the alarm limits    testerId=${hub}
+    Assert LED State          true
+
+    # A reset, from a flat battery or someone pulling it (threat T-06), must not quietly bring back
+    # the defaults: the oximeter starts with the clinician's limits, and nothing is sent again.
+    ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
+    Execute Command           mach set "oximeter"
+    Execute Command           machine Reset
+    Wait For Line On Uart     alarm limits: SpO2 below 95%    testerId=${oximeter}
+    Wait For Line On Uart     ALARM: SpO2 low    testerId=${oximeter}    timeout=10
+    Assert LED State          true

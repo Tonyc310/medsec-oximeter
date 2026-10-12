@@ -4,6 +4,7 @@
 #include "limits_auth.h"
 #include "limits_crypto.h"
 #include "limits_key.h"
+#include "limits_store.h"
 #include "medsec_bt.h"
 
 #include <errno.h>
@@ -57,6 +58,13 @@ static ssize_t write_limits(struct bt_conn *conn, const struct bt_gatt_attr *att
     if (!limits_auth_apply(&auth, buf, len, &requested)) {
         LOG_WRN("alarm limits change refused: unsigned, stale or out of range");
         return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
+    }
+    /* Saved before it applies: a change a reset would undo is refused, so the clinician knows. */
+    const int err = limits_store_save(&requested);
+
+    if (err != 0) {
+        LOG_ERR("alarm limits change refused: saving it failed (%d)", err);
+        return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
     }
 
     const k_spinlock_key_t key = k_spin_lock(&lock);
@@ -132,7 +140,14 @@ static void log_alarms(uint8_t alarms)
 
 int alarm_service_init(void)
 {
-    limits = alarm_default_limits();
+    /* Monitoring matters more than the stored limits: if they can't be read, the defaults hold. */
+    const int err = limits_store_load(&limits);
+
+    if (err != 0) {
+        LOG_ERR("stored alarm limits unreadable (%d): using the defaults", err);
+    }
+    LOG_INF("alarm limits: SpO2 below %u%%, pulse below %u or above %u bpm",
+            limits.spo2_low_percent, limits.pulse_low_bpm, limits.pulse_high_bpm);
     if (!limits_crypto_init(limits_key, sizeof limits_key)) {
         return -EIO;
     }
