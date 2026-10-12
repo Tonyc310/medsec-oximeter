@@ -88,7 +88,14 @@ clang-tidy -p build/host core/src/*.c
 cppcheck --std=c11 --enable=warning,style,performance,portability -I core/include core/src
 ```
 
-The unit tests cover the oximetry analysis, the PLX encoder and decoder, the alarm checks and limit settings, and the checks on signed limit changes. The Robot Framework test boots both boards in [Renode](https://renode.io) 1.17, joined by a simulated Bluetooth link, with the sensor model set to a patient (90 bpm, 94%). It checks the hub receives that reading and the alarm LED stays off, then sets a 95% limit from the hub's shell and checks the oximeter accepts it, alarms, and lights the LED. It needs `renode-test` on `PATH` with its Python packages (`pip install -r <renode>/tests/requirements.txt`). It writes its report to the working directory, so run it from the build tree:
+The unit tests cover the oximetry analysis, the PLX encoder and decoder, the alarm checks and limit settings, and the checks on signed limit changes. The PSA Crypto binding in `app/` that gives those checks HMAC-SHA-256 runs its tests as a Zephyr program on the PC (`native_sim`), against RFC 4231's test vectors:
+
+```bash
+west build -b native_sim/native/64 -d build/limits_crypto app/tests/limits_crypto
+build/limits_crypto/zephyr/zephyr.exe
+```
+
+The Robot Framework test boots both boards in [Renode](https://renode.io) 1.17, joined by a simulated Bluetooth link, with the sensor model set to a patient (90 bpm, 94%). It checks the hub receives that reading and the alarm LED stays off, then sets a 95% limit from the hub's shell and checks the oximeter accepts it, alarms, and lights the LED. It needs `renode-test` on `PATH` with its Python packages (`pip install -r <renode>/tests/requirements.txt`). It writes its report to the working directory, so run it from the build tree:
 
 ```bash
 mkdir -p build/renode && cd build/renode && renode-test ../../renode/oximeter.robot
@@ -97,7 +104,7 @@ mkdir -p build/renode && cd build/renode && renode-test ../../renode/oximeter.ro
 ## Layout
 
 ```
-app/            the oximeter's Zephyr application: west.yml (the Zephyr pin), prj.conf, board overlay, src/
+app/            the oximeter's Zephyr application: west.yml (the Zephyr pin), prj.conf, board overlay, src/, tests/
 hub/            the stand-in gateway's Zephyr application
 common/         Bluetooth definitions the two applications share
 core/           the oximetry analysis, the PLX encoding, the alarm checks and signed limit changes: portable C17, no Zephyr

@@ -13,7 +13,8 @@ jobs:
       - name: Check formatting
         run: >-
           pipx run clang-format==23.1.2 --dry-run --Werror
-          app/src/*.[ch] hub/src/*.c common/include/*.h core/include/*.h core/src/*.c tests/*.c
+          app/src/*.[ch] app/tests/*/src/*.c hub/src/*.c common/include/*.h core/include/*.h
+          core/src/*.c tests/*.c
 
   host:
     runs-on: ubuntu-24.04
@@ -54,6 +55,12 @@ jobs:
         with:
           app-path: app
           toolchains: arm-zephyr-eabi
+
+      # The PSA Crypto binding's tests run as a Linux program (native_sim): no board needed.
+      - name: Crypto binding tests
+        run: |
+          west build -b native_sim/native/64 -d build/limits_crypto app/tests/limits_crypto
+          build/limits_crypto/zephyr/zephyr.exe
 
       - name: Build the oximeter and the hub
         run: |
