@@ -92,13 +92,15 @@ clang-tidy -p build/host core/src/*.c
 cppcheck --std=c11 --enable=warning,style,performance,portability -I core/include core/src
 ```
 
-The unit tests cover the oximetry analysis, the PLX encoder and decoder, the alarm checks and limit settings, and the checks on signed limit changes. The PSA Crypto binding in `app/` that gives those checks HMAC-SHA-256 runs its tests as a Zephyr program on the PC (`native_sim`), against RFC 4231's test vectors, and so does the hub's signer, against the oximeter's own checks:
+The unit tests cover the oximetry analysis, the PLX encoder and decoder, the alarm checks and limit settings, and the checks on signed limit changes. Code that needs Zephyr runs its tests as Zephyr programs on the PC (`native_sim`): the PSA Crypto binding that gives those checks HMAC-SHA-256, against RFC 4231's test vectors; the hub's signer, against the oximeter's own checks; and the storage that keeps the alarm limits through a reset, on simulated flash:
 
 ```bash
 west build -b native_sim/native/64 -d build/limits_crypto app/tests/limits_crypto
 build/limits_crypto/zephyr/zephyr.exe
 west build -b native_sim/native/64 -d build/limits_signer hub/tests/limits_signer
 build/limits_signer/zephyr/zephyr.exe
+west build -b native_sim/native/64 -d build/limits_store app/tests/limits_store
+build/limits_store/zephyr/zephyr.exe
 ```
 
 The Robot Framework tests boot both boards in [Renode](https://renode.io) 1.17, joined by a simulated Bluetooth link, with the sensor model set to a patient (90 bpm, 94%). The first checks the hub receives that reading and the alarm LED stays off, then sets a 95% limit from the hub's shell and checks the oximeter accepts the signed change, alarms, and lights the LED. The second runs the same hub built with a key of its own, as a gateway that wasn't given this oximeter's key, and checks the oximeter refuses its change and keeps monitoring under the old limits. They need `renode-test` on `PATH` with its Python packages (`pip install -r <renode>/tests/requirements.txt`), and write their report to the working directory, so run them from the build tree:
