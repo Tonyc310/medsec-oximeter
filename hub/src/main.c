@@ -1,4 +1,7 @@
 #include "alarm.h"
+#include "limits_auth.h"
+#include "limits_key.h"
+#include "limits_signer.h"
 #include "medsec_bt.h"
 #include "plx.h"
 
@@ -15,19 +18,21 @@
 LOG_MODULE_REGISTER(hub, LOG_LEVEL_INF);
 
 /* A stand-in for the bedside gateway: it finds a pulse oximeter, logs its readings and alarms,
- * and sets its alarm limits from the shell. */
+ * and sets its alarm limits from the shell, signing each change as the backend will. */
 
 /* Discovery reads its UUID after the call that starts it has returned, and the BT_UUID_* macros
  * make temporaries, so these live at file scope. */
 static const struct bt_uuid_16 continuous_measurement = BT_UUID_INIT_16(BT_UUID_GATT_PLX_CM_VAL);
 static const struct bt_uuid_128 alarm_limits = BT_UUID_INIT_128(MEDSEC_ALARM_LIMITS_VAL);
 static const struct bt_uuid_128 alarm_state = BT_UUID_INIT_128(MEDSEC_ALARM_STATE_VAL);
+static const struct bt_uuid_128 alarm_challenge = BT_UUID_INIT_128(MEDSEC_ALARM_CHALLENGE_VAL);
 
 static struct bt_conn *oximeter;
 static struct bt_gatt_discover_params discover_params;
 static uint16_t measurement_handle;
 static uint16_t limits_handle;
 static uint16_t state_handle;
+static uint16_t challenge_handle;
 
 /* Each subscription finds its own CCC descriptor, so each needs its own discovery parameters. */
 static struct bt_gatt_subscribe_params measurement_subscription;
@@ -35,9 +40,12 @@ static struct bt_gatt_discover_params measurement_ccc_discovery;
 static struct bt_gatt_subscribe_params alarm_subscription;
 static struct bt_gatt_discover_params alarm_ccc_discovery;
 
-/* A write's data must stay valid until the oximeter answers. */
+/* A limits change takes two steps: read the oximeter's challenge, then write the limits signed
+ * over it. The parameters and data must stay valid until the oximeter answers each step. */
+static alarm_limits_t requested;
+static struct bt_gatt_read_params challenge_read;
 static struct bt_gatt_write_params write_params;
-static uint8_t limits_value[ALARM_LIMITS_SIZE];
+static uint8_t command[LIMITS_AUTH_COMMAND_SIZE];
 
 static void start_scan(void);
 
@@ -113,13 +121,14 @@ static void subscribe(struct bt_conn *conn, struct bt_gatt_subscribe_params *sub
     }
 }
 
-/* One pass over every characteristic, noting the three the hub uses; then subscribe. */
+/* One pass over every characteristic, noting the four the hub uses; then subscribe. */
 static uint8_t on_characteristic(struct bt_conn *conn, const struct bt_gatt_attr *attr,
                                  struct bt_gatt_discover_params *params)
 {
     ARG_UNUSED(params);
     if (attr == NULL) {
-        if ((measurement_handle == 0u) || (limits_handle == 0u) || (state_handle == 0u)) {
+        if ((measurement_handle == 0u) || (limits_handle == 0u) || (state_handle == 0u) ||
+            (challenge_handle == 0u)) {
             LOG_WRN("not a pulse oximeter this hub knows");
             return BT_GATT_ITER_STOP;
         }
@@ -138,6 +147,8 @@ static uint8_t on_characteristic(struct bt_conn *conn, const struct bt_gatt_attr
         limits_handle = characteristic->value_handle;
     } else if (bt_uuid_cmp(characteristic->uuid, &alarm_state.uuid) == 0) {
         state_handle = characteristic->value_handle;
+    } else if (bt_uuid_cmp(characteristic->uuid, &alarm_challenge.uuid) == 0) {
+        challenge_handle = characteristic->value_handle;
     }
     return BT_GATT_ITER_CONTINUE;
 }
@@ -151,6 +162,36 @@ static void on_written(struct bt_conn *conn, uint8_t err, struct bt_gatt_write_p
     } else {
         LOG_INF("oximeter accepted the alarm limits");
     }
+}
+
+static uint8_t on_challenge(struct bt_conn *conn, uint8_t err, struct bt_gatt_read_params *params,
+                            const void *data, uint16_t length)
+{
+    ARG_UNUSED(params);
+    if (data == NULL) {
+        return BT_GATT_ITER_STOP;
+    }
+    if ((err != 0u) || (length != LIMITS_AUTH_CHALLENGE_SIZE)) {
+        LOG_WRN("couldn't read the oximeter's challenge (ATT error 0x%02x, %u bytes)", err, length);
+        return BT_GATT_ITER_STOP;
+    }
+    if (!limits_signer_sign(data, &requested, command)) {
+        LOG_ERR("signing the alarm limits failed");
+        return BT_GATT_ITER_STOP;
+    }
+
+    write_params.handle = limits_handle;
+    write_params.offset = 0u;
+    write_params.data = command;
+    write_params.length = sizeof command;
+    write_params.func = on_written;
+
+    const int write_err = bt_gatt_write(conn, &write_params);
+
+    if (write_err != 0) {
+        LOG_ERR("sending the alarm limits failed: %d", write_err);
+    }
+    return BT_GATT_ITER_STOP;
 }
 
 static int parse_limit(const struct shell *sh, const char *text, unsigned long *value)
@@ -177,16 +218,17 @@ static int cmd_limits(const struct shell *sh, size_t argc, char **argv)
         return -EINVAL;
     }
 
-    const alarm_limits_t requested = {
+    const alarm_limits_t entered = {
         .spo2_low_percent = (uint8_t)spo2_low,
         .pulse_low_bpm = (uint16_t)pulse_low,
         .pulse_high_bpm = (uint16_t)pulse_high,
     };
+    uint8_t encoded[ALARM_LIMITS_SIZE];
     alarm_limits_t checked;
 
-    alarm_limits_encode(&requested, limits_value);
+    alarm_limits_encode(&entered, encoded);
     /* The oximeter checks them too; checking here gives a clearer message. */
-    if (!alarm_limits_decode(limits_value, sizeof limits_value, &checked)) {
+    if (!alarm_limits_decode(encoded, sizeof encoded, &checked)) {
         shell_error(sh, "a monitor wouldn't accept those limits");
         return -EINVAL;
     }
@@ -195,16 +237,16 @@ static int cmd_limits(const struct shell *sh, size_t argc, char **argv)
         return -ENOTCONN;
     }
 
-    write_params.handle = limits_handle;
-    write_params.offset = 0u;
-    write_params.data = limits_value;
-    write_params.length = sizeof limits_value;
-    write_params.func = on_written;
+    requested = checked;
+    challenge_read.func = on_challenge;
+    challenge_read.handle_count = 1u;
+    challenge_read.single.handle = challenge_handle;
+    challenge_read.single.offset = 0u;
 
-    const int err = bt_gatt_write(oximeter, &write_params);
+    const int err = bt_gatt_read(oximeter, &challenge_read);
 
     if (err != 0) {
-        shell_error(sh, "sending the limits failed: %d", err);
+        shell_error(sh, "reading the challenge failed: %d", err);
         return err;
     }
     return 0;
@@ -307,6 +349,10 @@ BT_CONN_CB_DEFINE(connection_callbacks) = {
 int main(void)
 {
     LOG_INF("hub started");
+    if (!limits_signer_init(limits_key, sizeof limits_key)) {
+        LOG_ERR("could not load the alarm-limits key");
+        return 0;
+    }
     if (bt_enable(NULL) != 0) {
         LOG_ERR("could not start Bluetooth");
         return 0;

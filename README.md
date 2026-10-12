@@ -12,6 +12,8 @@ Phase 2 of 7, the baseline device, is complete. Once a second the firmware works
 
 Phase 3, the architecture views and threat model, is under way in [docs/security/](docs/security/): so far the [system description](docs/security/system.md), the [threat model](docs/security/threat-model.md) and the [updatability view](docs/security/updatability.md).
 
+Phase 4, the security controls, has started with the threat model's central case: a change of alarm limits must now be signed (see [Alarms](#alarms)).
+
 Renode has no model of the MAX30101, so [renode/Max30101.cs](renode/Max30101.cs) adds one: the registers Zephyr's driver uses, the 32-sample FIFO filled at the configured rate, the interrupt line, and a synthetic pulse waveform whose light level, pulse depth and heart rate a test can set.
 
 ## How it measures
@@ -36,9 +38,11 @@ The baseline link has no pairing or encryption, so anyone in range can connect a
 
 The oximeter alarms when SpO2 falls below its limit or the pulse rate leaves its range (by default under 90%, or under 50 or over 120 bpm), and raises a technical alarm when it finds no pulse. An alarm lights LED1 on the DK and is sent to the hub as a notification.
 
-The limits are a read-write characteristic in a second, vendor-specific service. The hub sets them from its shell, the way a clinician would at a central station: `limits 95 50 120`. The oximeter refuses settings a monitor wouldn't offer, such as an SpO2 limit of 100% or a low pulse limit above the high one, and keeps the last accepted ones.
+The limits are a characteristic in a second, vendor-specific service. The hub sets them from its shell, the way a clinician would at a central station: `limits 95 50 120`. The oximeter refuses settings a monitor wouldn't offer, such as an SpO2 limit of 100% or a low pulse limit above the high one, and keeps the last accepted ones.
 
-Range checks keep out nonsense, not malice. A 50% SpO2 limit is a legitimate setting, and it also silences a hypoxia alarm. In the baseline any device in range can write it, which makes this write the threat model's central case. Two simplifications a real monitor wouldn't make: there's no alarm delay to avoid nuisance alarms (IEC 60601-1-8), and the limits return to the defaults at power-up.
+Range checks keep out nonsense, not malice: a 50% SpO2 limit is a legitimate setting, and it also silences a hypoxia alarm. So a change has to be signed. The oximeter offers a random 16-byte challenge, replaced after every attempt and on every connection. A change is the limits followed by a tag over the challenge and the limits: HMAC-SHA256 cut to 128 bits ([core/src/limits_auth.c](core/src/limits_auth.c)). Only a holder of the key can make the tag, and each tag works once. The hub signs the way the monitoring backend will. Until devices get keys of their own, a later Phase 4 control, both builds share a key that the first build generates into `build/limits.key`, which is never committed.
+
+Two simplifications a real monitor wouldn't make: there's no alarm delay to avoid nuisance alarms (IEC 60601-1-8), and the limits return to the defaults at power-up.
 
 ## Hardware
 
@@ -97,9 +101,10 @@ west build -b native_sim/native/64 -d build/limits_signer hub/tests/limits_signe
 build/limits_signer/zephyr/zephyr.exe
 ```
 
-The Robot Framework test boots both boards in [Renode](https://renode.io) 1.17, joined by a simulated Bluetooth link, with the sensor model set to a patient (90 bpm, 94%). It checks the hub receives that reading and the alarm LED stays off, then sets a 95% limit from the hub's shell and checks the oximeter accepts it, alarms, and lights the LED. It needs `renode-test` on `PATH` with its Python packages (`pip install -r <renode>/tests/requirements.txt`). It writes its report to the working directory, so run it from the build tree:
+The Robot Framework tests boot both boards in [Renode](https://renode.io) 1.17, joined by a simulated Bluetooth link, with the sensor model set to a patient (90 bpm, 94%). The first checks the hub receives that reading and the alarm LED stays off, then sets a 95% limit from the hub's shell and checks the oximeter accepts the signed change, alarms, and lights the LED. The second runs the same hub built with a key of its own, as a gateway that wasn't given this oximeter's key, and checks the oximeter refuses its change and keeps monitoring under the old limits. They need `renode-test` on `PATH` with its Python packages (`pip install -r <renode>/tests/requirements.txt`), and write their report to the working directory, so run them from the build tree:
 
 ```bash
+west build -b nrf52840dk/nrf52840 -d build/hub-other-key hub -- -DLIMITS_KEY_FILE=$PWD/build/other-limits.key
 mkdir -p build/renode && cd build/renode && renode-test ../../renode/oximeter.robot
 ```
 

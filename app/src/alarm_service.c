@@ -1,9 +1,13 @@
 #include "alarm_service.h"
 
 #include "alarm.h"
+#include "limits_auth.h"
+#include "limits_crypto.h"
+#include "limits_key.h"
 #include "medsec_bt.h"
 
 #include <errno.h>
+#include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
@@ -14,6 +18,7 @@ LOG_MODULE_REGISTER(alarm_service, LOG_LEVEL_INF);
 static const struct bt_uuid_128 service_uuid = BT_UUID_INIT_128(MEDSEC_ALARM_SERVICE_VAL);
 static const struct bt_uuid_128 limits_uuid = BT_UUID_INIT_128(MEDSEC_ALARM_LIMITS_VAL);
 static const struct bt_uuid_128 state_uuid = BT_UUID_INIT_128(MEDSEC_ALARM_STATE_VAL);
+static const struct bt_uuid_128 challenge_uuid = BT_UUID_INIT_128(MEDSEC_ALARM_CHALLENGE_VAL);
 
 /* LED1 on the DK. */
 static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
@@ -22,6 +27,10 @@ static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
 static struct k_spinlock lock;
 static alarm_limits_t limits;
 static uint8_t state; /* ALARM_* bits; written only from the sensor thread */
+
+/* Used only on the Bluetooth receive thread (CONFIG_BT_RECV_WORKQ_BT), which runs the GATT and
+ * connection callbacks, after alarm_service_init: no lock needed. */
+static limits_auth_t auth;
 
 static ssize_t read_limits(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf,
                            uint16_t len, uint16_t offset)
@@ -45,8 +54,8 @@ static ssize_t write_limits(struct bt_conn *conn, const struct bt_gatt_attr *att
     if (offset != 0u) {
         return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
     }
-    if (!alarm_limits_decode(buf, len, &requested)) {
-        LOG_WRN("alarm limits rejected (%u bytes)", len);
+    if (!limits_auth_apply(&auth, buf, len, &requested)) {
+        LOG_WRN("alarm limits change refused: unsigned, stale or out of range");
         return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
     }
 
@@ -67,14 +76,37 @@ static ssize_t read_state(struct bt_conn *conn, const struct bt_gatt_attr *attr,
     return bt_gatt_attr_read(conn, attr, buf, len, offset, &value, sizeof value);
 }
 
-/* Open in the baseline: any device in range can change the limits (threats T-01 to T-03). */
+static ssize_t read_challenge(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf,
+                              uint16_t len, uint16_t offset)
+{
+    return bt_gatt_attr_read(conn, attr, buf, len, offset, limits_auth_challenge(&auth),
+                             LIMITS_AUTH_CHALLENGE_SIZE);
+}
+
+/* Anyone in range can read the limits, but only a holder of the limits key can change them, and
+ * only once per challenge (threats T-01 to T-03). */
 BT_GATT_SERVICE_DEFINE(
     alarm_service, BT_GATT_PRIMARY_SERVICE(&service_uuid),
     BT_GATT_CHARACTERISTIC(&limits_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,
                            BT_GATT_PERM_READ | BT_GATT_PERM_WRITE, read_limits, write_limits, NULL),
     BT_GATT_CHARACTERISTIC(&state_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
                            BT_GATT_PERM_READ, read_state, NULL, NULL),
-    BT_GATT_CCC(NULL, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE));
+    BT_GATT_CCC(NULL, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+    BT_GATT_CHARACTERISTIC(&challenge_uuid.uuid, BT_GATT_CHRC_READ, BT_GATT_PERM_READ,
+                           read_challenge, NULL, NULL));
+
+/* A command made on an earlier connection is never valid on this one. */
+static void on_connected(struct bt_conn *conn, uint8_t err)
+{
+    ARG_UNUSED(conn);
+    if (err == 0u) {
+        limits_auth_new_challenge(&auth);
+    }
+}
+
+BT_CONN_CB_DEFINE(alarm_connection_callbacks) = {
+    .connected = on_connected,
+};
 
 /* attrs[3] is the alarm state characteristic: after the service and the limits' two attributes. */
 #define ALARM_STATE (&alarm_service.attrs[3])
@@ -101,6 +133,10 @@ static void log_alarms(uint8_t alarms)
 int alarm_service_init(void)
 {
     limits = alarm_default_limits();
+    if (!limits_crypto_init(limits_key, sizeof limits_key)) {
+        return -EIO;
+    }
+    limits_auth_init(&auth, &limits_crypto);
     if (!gpio_is_ready_dt(&led)) {
         return -ENODEV;
     }

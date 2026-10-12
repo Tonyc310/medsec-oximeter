@@ -64,10 +64,13 @@ jobs:
           west build -b native_sim/native/64 -d build/limits_signer hub/tests/limits_signer
           build/limits_signer/zephyr/zephyr.exe
 
-      - name: Build the oximeter and the hub
+      # The second hub has a key of its own, for the test that a stranger's change is refused.
+      - name: Build the oximeter and the hubs
         run: |
           west build -b nrf52840dk/nrf52840 -d build/oximeter app
           west build -b nrf52840dk/nrf52840 -d build/hub hub
+          west build -b nrf52840dk/nrf52840 -d build/hub-other-key hub -- \
+            -DLIMITS_KEY_FILE=$PWD/build/other-limits.key
 
       - name: Install Renode
         run: |
