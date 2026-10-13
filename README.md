@@ -100,7 +100,7 @@ build/limits_crypto/zephyr/zephyr.exe
 west build -b native_sim/native/64 -d build/limits_signer hub/tests/limits_signer
 build/limits_signer/zephyr/zephyr.exe
 west build -b native_sim/native/64 -d build/limits_store app/tests/limits_store
-build/limits_store/zephyr/zephyr.exe
+build/limits_store/zephyr/zephyr.exe -flash_in_ram
 ```
 
 The Robot Framework tests boot both boards in [Renode](https://renode.io) 1.17, joined by a simulated Bluetooth link, with the sensor model set to a patient (90 bpm, 94%). The first checks the hub receives that reading and the alarm LED stays off, then sets a 95% limit from the hub's shell and checks the oximeter accepts the signed change, alarms, and lights the LED. The second runs the same hub built with a key of its own, as a gateway that wasn't given this oximeter's key, and checks the oximeter refuses its change and keeps monitoring under the old limits. The third sets the limits, resets the oximeter, and checks it starts with them and alarms again. They need `renode-test` on `PATH` with its Python packages (`pip install -r <renode>/tests/requirements.txt`), and write their report to the working directory, so run them from the build tree:

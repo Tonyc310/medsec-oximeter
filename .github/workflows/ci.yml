@@ -56,7 +56,8 @@ jobs:
           app-path: app
           toolchains: arm-zephyr-eabi
 
-      # Tests of code that needs Zephyr, run as Linux programs (native_sim): no board needed.
+      # Tests of code that needs Zephyr, run as Linux programs (native_sim): no board needed. The
+      # store's simulated flash stays in memory, erased at each start, rather than in a file.
       - name: Tests on native_sim
         run: |
           west build -b native_sim/native/64 -d build/limits_crypto app/tests/limits_crypto
@@ -64,7 +65,7 @@ jobs:
           west build -b native_sim/native/64 -d build/limits_signer hub/tests/limits_signer
           build/limits_signer/zephyr/zephyr.exe
           west build -b native_sim/native/64 -d build/limits_store app/tests/limits_store
-          build/limits_store/zephyr/zephyr.exe
+          build/limits_store/zephyr/zephyr.exe -flash_in_ram
 
       # The second hub has a key of its own, for the test that a stranger's change is refused.
       # Zephyr's flash driver tests, on the internal flash, check the flash controller model.
