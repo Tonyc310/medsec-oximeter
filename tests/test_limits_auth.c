@@ -102,7 +102,8 @@ static void test_accepts_limits_signed_over_the_current_challenge(void)
     uint8_t command[LIMITS_AUTH_COMMAND_SIZE];
 
     sign(raised, command);
-    TEST_ASSERT_TRUE(limits_auth_apply(&auth, command, sizeof command, &limits));
+    TEST_ASSERT_EQUAL_INT(LIMITS_AUTH_ACCEPTED,
+                          limits_auth_apply(&auth, command, sizeof command, &limits));
     TEST_ASSERT_EQUAL_UINT8(95u, limits.spo2_low_percent);
     TEST_ASSERT_EQUAL_UINT16(40u, limits.pulse_low_bpm);
     TEST_ASSERT_EQUAL_UINT16(130u, limits.pulse_high_bpm);
@@ -114,7 +115,8 @@ static void test_rejects_a_tag_made_over_different_limits(void)
 
     sign(raised, command);
     command[0] = 50u; /* the SpO2 limit, after signing */
-    TEST_ASSERT_FALSE(limits_auth_apply(&auth, command, sizeof command, &limits));
+    TEST_ASSERT_EQUAL_INT(LIMITS_AUTH_BAD_TAG,
+                          limits_auth_apply(&auth, command, sizeof command, &limits));
 }
 
 static void test_rejects_a_tag_made_for_another_challenge(void)
@@ -123,7 +125,8 @@ static void test_rejects_a_tag_made_for_another_challenge(void)
 
     sign(raised, command);
     limits_auth_new_challenge(&auth);
-    TEST_ASSERT_FALSE(limits_auth_apply(&auth, command, sizeof command, &limits));
+    TEST_ASSERT_EQUAL_INT(LIMITS_AUTH_BAD_TAG,
+                          limits_auth_apply(&auth, command, sizeof command, &limits));
 }
 
 static void test_never_accepts_the_same_command_twice(void)
@@ -131,8 +134,10 @@ static void test_never_accepts_the_same_command_twice(void)
     uint8_t command[LIMITS_AUTH_COMMAND_SIZE];
 
     sign(raised, command);
-    TEST_ASSERT_TRUE(limits_auth_apply(&auth, command, sizeof command, &limits));
-    TEST_ASSERT_FALSE(limits_auth_apply(&auth, command, sizeof command, &limits));
+    TEST_ASSERT_EQUAL_INT(LIMITS_AUTH_ACCEPTED,
+                          limits_auth_apply(&auth, command, sizeof command, &limits));
+    TEST_ASSERT_EQUAL_INT(LIMITS_AUTH_BAD_TAG,
+                          limits_auth_apply(&auth, command, sizeof command, &limits));
 }
 
 /* So every guess at a tag is made against a fresh challenge. */
@@ -142,7 +147,8 @@ static void test_replaces_the_challenge_after_a_rejected_attempt(void)
 
     sign(raised, command);
     command[0] = 50u;
-    TEST_ASSERT_FALSE(limits_auth_apply(&auth, command, sizeof command, &limits));
+    TEST_ASSERT_EQUAL_INT(LIMITS_AUTH_BAD_TAG,
+                          limits_auth_apply(&auth, command, sizeof command, &limits));
     expect_challenge(0x20u);
 }
 
@@ -152,7 +158,8 @@ static void test_keeps_the_limits_in_force_when_it_rejects_a_command(void)
 
     sign(raised, command);
     command[0] = 50u;
-    TEST_ASSERT_FALSE(limits_auth_apply(&auth, command, sizeof command, &limits));
+    TEST_ASSERT_EQUAL_INT(LIMITS_AUTH_BAD_TAG,
+                          limits_auth_apply(&auth, command, sizeof command, &limits));
     /* Still the defaults. */
     TEST_ASSERT_EQUAL_UINT8(90u, limits.spo2_low_percent);
     TEST_ASSERT_EQUAL_UINT16(50u, limits.pulse_low_bpm);
@@ -166,9 +173,11 @@ static void test_rejects_a_command_of_the_wrong_length(void)
 
     sign(raised, too_long);
     memcpy(too_short, too_long, sizeof too_short);
-    TEST_ASSERT_FALSE(limits_auth_apply(&auth, too_short, sizeof too_short, &limits));
+    TEST_ASSERT_EQUAL_INT(LIMITS_AUTH_WRONG_LENGTH,
+                          limits_auth_apply(&auth, too_short, sizeof too_short, &limits));
     sign(raised, too_long);
-    TEST_ASSERT_FALSE(limits_auth_apply(&auth, too_long, sizeof too_long, &limits));
+    TEST_ASSERT_EQUAL_INT(LIMITS_AUTH_WRONG_LENGTH,
+                          limits_auth_apply(&auth, too_long, sizeof too_long, &limits));
 }
 
 /* Authentication says who sent the limits, not that they're sensible. */
@@ -178,7 +187,8 @@ static void test_still_rejects_authentic_limits_out_of_range(void)
     uint8_t command[LIMITS_AUTH_COMMAND_SIZE];
 
     sign(spo2_limit_100, command);
-    TEST_ASSERT_FALSE(limits_auth_apply(&auth, command, sizeof command, &limits));
+    TEST_ASSERT_EQUAL_INT(LIMITS_AUTH_INVALID_LIMITS,
+                          limits_auth_apply(&auth, command, sizeof command, &limits));
 }
 
 /* A challenge that couldn't be replaced mustn't stay usable: that would let a command be replayed.
@@ -190,7 +200,8 @@ static void test_rejects_every_command_when_no_new_challenge_can_be_made(void)
     sign(raised, command);
     random_fails = true;
     limits_auth_new_challenge(&auth);
-    TEST_ASSERT_FALSE(limits_auth_apply(&auth, command, sizeof command, &limits));
+    TEST_ASSERT_EQUAL_INT(LIMITS_AUTH_NO_CHALLENGE,
+                          limits_auth_apply(&auth, command, sizeof command, &limits));
 }
 
 int main(void)

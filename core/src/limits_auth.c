@@ -30,26 +30,33 @@ void limits_auth_message(const uint8_t challenge[LIMITS_AUTH_CHALLENGE_SIZE],
     alarm_limits_encode(limits, &message[LIMITS_AUTH_CHALLENGE_SIZE]);
 }
 
-bool limits_auth_apply(limits_auth_t *auth, const uint8_t *command, size_t length,
-                       alarm_limits_t *limits)
+limits_auth_result_t limits_auth_apply(limits_auth_t *auth, const uint8_t *command, size_t length,
+                                       alarm_limits_t *limits)
 {
     alarm_limits_t requested;
-    bool authentic = false;
+    limits_auth_result_t result;
 
-    /* Encoding the decoded limits gives back the bytes that were sent, so the tag is checked over
-     * exactly what arrived. */
-    if (auth->fresh && (length == LIMITS_AUTH_COMMAND_SIZE) &&
-        alarm_limits_decode(command, ALARM_LIMITS_SIZE, &requested)) {
+    if (!auth->fresh) {
+        result = LIMITS_AUTH_NO_CHALLENGE;
+    } else if (length != LIMITS_AUTH_COMMAND_SIZE) {
+        result = LIMITS_AUTH_WRONG_LENGTH;
+    } else if (!alarm_limits_decode(command, ALARM_LIMITS_SIZE, &requested)) {
+        result = LIMITS_AUTH_INVALID_LIMITS;
+    } else {
         uint8_t message[LIMITS_AUTH_MESSAGE_SIZE];
 
+        /* Encoding the decoded limits gives back the bytes that were sent, so the tag is checked
+         * over exactly what arrived. */
         limits_auth_message(auth->challenge, &requested, message);
-        authentic = auth->crypto->verify(message, sizeof message, &command[ALARM_LIMITS_SIZE]);
+        result = auth->crypto->verify(message, sizeof message, &command[ALARM_LIMITS_SIZE])
+                     ? LIMITS_AUTH_ACCEPTED
+                     : LIMITS_AUTH_BAD_TAG;
     }
 
     /* Every attempt uses up the challenge, accepted or not. */
     renew(auth);
-    if (authentic) {
+    if (result == LIMITS_AUTH_ACCEPTED) {
         *limits = requested;
     }
-    return authentic;
+    return result;
 }

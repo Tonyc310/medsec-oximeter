@@ -58,8 +58,10 @@ static ssize_t write_limits(struct bt_conn *conn, const struct bt_gatt_attr *att
     if (offset != 0u) {
         return BT_GATT_ERR(BT_ATT_ERR_INVALID_OFFSET);
     }
-    if (!limits_auth_apply(&auth, buf, len, &requested)) {
-        LOG_WRN("alarm limits change refused: unsigned, stale or out of range");
+    const limits_auth_result_t result = limits_auth_apply(&auth, buf, len, &requested);
+
+    if (result != LIMITS_AUTH_ACCEPTED) {
+        LOG_WRN("alarm limits change refused (reason %d)", (int)result);
         return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
     }
     /* Saved before it applies: a change a reset would undo is refused, so the clinician knows. */

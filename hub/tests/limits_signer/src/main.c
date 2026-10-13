@@ -19,7 +19,8 @@ ZTEST(limits_signer, test_signs_commands_the_oximeter_accepts)
     alarm_limits_t limits = alarm_default_limits();
 
     zassert_true(limits_signer_sign(limits_auth_challenge(&oximeter), &raised, command));
-    zassert_true(limits_auth_apply(&oximeter, command, sizeof command, &limits));
+    zassert_equal(limits_auth_apply(&oximeter, command, sizeof command, &limits),
+                  LIMITS_AUTH_ACCEPTED);
     zassert_equal(limits.spo2_low_percent, 95u);
     zassert_equal(limits.pulse_low_bpm, 40u);
     zassert_equal(limits.pulse_high_bpm, 130u);
@@ -34,7 +35,8 @@ ZTEST(limits_signer, test_commands_signed_with_another_key_are_refused)
 
     zassert_true(limits_signer_init(other_key, sizeof other_key));
     zassert_true(limits_signer_sign(limits_auth_challenge(&oximeter), &raised, command));
-    zassert_false(limits_auth_apply(&oximeter, command, sizeof command, &limits));
+    zassert_equal(limits_auth_apply(&oximeter, command, sizeof command, &limits),
+                  LIMITS_AUTH_BAD_TAG);
 }
 
 /* Both sides start each test holding the same key, as the oximeter and its hub do. */
