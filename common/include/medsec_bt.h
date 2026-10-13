@@ -11,5 +11,6 @@
 #define MEDSEC_ALARM_LIMITS_VAL MEDSEC_UUID(2)    /* alarm limits: read, and signed writes */
 #define MEDSEC_ALARM_STATE_VAL MEDSEC_UUID(3)     /* ALARM_* bits: read and notify */
 #define MEDSEC_ALARM_CHALLENGE_VAL MEDSEC_UUID(4) /* what a limits change is signed over: read */
+#define MEDSEC_SECURITY_LOG_VAL MEDSEC_UUID(5)    /* security event records, oldest first: read */
 
 #endif

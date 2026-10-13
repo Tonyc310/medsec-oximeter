@@ -94,3 +94,24 @@ Recovers From A Hang Through The Watchdog
     Wait For Line On Uart     alarm limits: SpO2 below 95%    testerId=${oximeter}    timeout=5
     Wait For Line On Uart     SpO2 94%, pulse (89|90|91) bpm    testerId=${oximeter}    treatAsRegex=true    timeout=10
     Assert LED State          true
+
+Logs The Security Events The Hub Reads
+    Start System
+    Monitor A Patient At 94 Percent
+    Write Line To Uart        limits 95 50 120    testerId=${hub}
+    Wait For Line On Uart     oximeter accepted the alarm limits    testerId=${hub}
+
+    Write Line To Uart        log    testerId=${hub}
+    Wait For Line On Uart     \#1 boot 1 \\+[0-9.]+ s: started    testerId=${hub}    treatAsRegex=true
+    Wait For Line On Uart     \#2 boot 1 \\+[0-9.]+ s: connected: C0:00:AA:BB:CC:DD \\(random\\)    testerId=${hub}    treatAsRegex=true
+    Wait For Line On Uart     \#3 boot 1 \\+[0-9.]+ s: limits accepted: SpO2 below 95%, pulse below 50 or above 120 bpm    testerId=${hub}    treatAsRegex=true
+
+Logs A Refused Change From A Hub Without Its Key
+    Start System              ${HUB_OTHER_KEY_ELF}
+    Monitor A Patient At 94 Percent
+    Write Line To Uart        limits 95 50 120    testerId=${hub}
+    Wait For Line On Uart     oximeter rejected the alarm limits (ATT error 0x13)    testerId=${hub}
+
+    # Anyone in range can read the log until pairing, the stranger included.
+    Write Line To Uart        log    testerId=${hub}
+    Wait For Line On Uart     \#3 boot 1 \\+[0-9.]+ s: limits refused: tag doesn't match    testerId=${hub}    treatAsRegex=true

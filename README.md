@@ -44,6 +44,8 @@ Range checks keep out nonsense, not malice: a 50% SpO2 limit is a legitimate set
 
 The oximeter watches itself too. If the sensor stops sending samples, from a fault or a loose connection, it raises the technical alarm within 1.5 s and sends "no reading" once a second, rather than falling silent. If the firmware itself stops, the nRF52840's watchdog resets it within 2 s ([app/src/supervisor.c](app/src/supervisor.c)).
 
+It also keeps a security event log in flash: each start-up with the reset cause, each central that connects, each limits change accepted or refused and why, and the sensor stopping and resuming ([core/src/security_log.c](core/src/security_log.c)). It holds the last 64 records, numbered so that a gap shows, and timed by boot and uptime, since the oximeter has no clock: the gateway adds the date when it reads them. Nothing over the air can change or erase it, though until pairing anyone in range can read it.
+
 Accepted limits are kept in flash (Zephyr's settings, on NVS), so a reset doesn't quietly bring back the defaults. A change the oximeter can't save is refused rather than applied until the next reset, so the clinician knows it didn't take. One simplification a real monitor wouldn't make: there's no alarm delay to avoid nuisance alarms (IEC 60601-1-8).
 
 ## Hardware
@@ -82,7 +84,7 @@ west build -b nrf52840dk/nrf52840 -d build/hub hub
 renode renode/oximeter.resc                # type `start`; each board's console opens in a window
 ```
 
-In the hub's window, `limits <SpO2 low %> <pulse low bpm> <pulse high bpm>` sets the oximeter's alarm limits. In Renode's monitor, `mach set "oximeter"` then `sysbus.twi0.max30101 HeartRate 130` (or `RedPulse`, `InfraredPulse`, `RedLevel`, `InfraredLevel`) changes the simulated patient.
+In the hub's window, `limits <SpO2 low %> <pulse low bpm> <pulse high bpm>` sets the oximeter's alarm limits, and `log` prints its security event log. In Renode's monitor, `mach set "oximeter"` then `sysbus.twi0.max30101 HeartRate 130` (or `RedPulse`, `InfraredPulse`, `RedLevel`, `InfraredLevel`) changes the simulated patient.
 
 ## Test
 
@@ -107,7 +109,7 @@ west build -b native_sim/native/64 -d build/event_log app/tests/event_log
 build/event_log/zephyr/zephyr.exe -flash_in_ram
 ```
 
-The Robot Framework tests boot both boards in [Renode](https://renode.io) 1.17, joined by a simulated Bluetooth link, with the sensor model set to a patient (90 bpm, 94%). The first checks the hub receives that reading and the alarm LED stays off, then sets a 95% limit from the hub's shell and checks the oximeter accepts the signed change, alarms, and lights the LED. The second runs the same hub built with a key of its own, as a gateway that wasn't given this oximeter's key, and checks the oximeter refuses its change and keeps monitoring under the old limits. The third sets the limits, resets the oximeter, and checks it starts with them and alarms again. The fourth stops the sensor and checks the technical alarm comes on within 2 s and the hub hears "no reading"; the fifth stops the processor and checks the watchdog brings the oximeter back, measuring under the clinician's limits. They need `renode-test` on `PATH` with its Python packages (`pip install -r <renode>/tests/requirements.txt`), and write their report to the working directory, so run them from the build tree:
+The Robot Framework tests boot both boards in [Renode](https://renode.io) 1.17, joined by a simulated Bluetooth link, with the sensor model set to a patient (90 bpm, 94%). The first checks the hub receives that reading and the alarm LED stays off, then sets a 95% limit from the hub's shell and checks the oximeter accepts the signed change, alarms, and lights the LED. The second runs the same hub built with a key of its own, as a gateway that wasn't given this oximeter's key, and checks the oximeter refuses its change and keeps monitoring under the old limits. The third sets the limits, resets the oximeter, and checks it starts with them and alarms again. The fourth stops the sensor and checks the technical alarm comes on within 2 s and the hub hears "no reading"; the fifth stops the processor and checks the watchdog brings the oximeter back, measuring under the clinician's limits. The last two read the security event log from the hub: one finds the start-up, the hub's connection and its accepted change; the other, run with the stranger's hub, finds its change refused because the tag doesn't match. They need `renode-test` on `PATH` with its Python packages (`pip install -r <renode>/tests/requirements.txt`), and write their report to the working directory, so run them from the build tree:
 
 ```bash
 west build -b nrf52840dk/nrf52840 -d build/hub-other-key hub -- -DLIMITS_KEY_FILE=$PWD/build/other-limits.key

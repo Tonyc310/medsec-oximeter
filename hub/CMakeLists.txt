@@ -6,6 +6,6 @@ project(medsec_hub LANGUAGES C)
 
 set(CORE ${CMAKE_CURRENT_SOURCE_DIR}/../core)
 target_sources(app PRIVATE src/main.c src/limits_signer.c ${CORE}/src/alarm.c
-    ${CORE}/src/limits_auth.c ${CORE}/src/plx.c)
+    ${CORE}/src/limits_auth.c ${CORE}/src/plx.c ${CORE}/src/security_log.c)
 target_include_directories(app PRIVATE ${CORE}/include ${CMAKE_CURRENT_SOURCE_DIR}/../common/include)
 include(${CMAKE_CURRENT_SOURCE_DIR}/../common/limits_key.cmake)

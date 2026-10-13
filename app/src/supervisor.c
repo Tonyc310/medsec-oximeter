@@ -1,5 +1,6 @@
 #include "supervisor.h"
 
+#include "event_log.h"
 #include "supervision.h"
 
 #include <errno.h>
@@ -12,7 +13,7 @@
  * missed checks mean the system has stopped running, and the watchdog resets it. */
 #define CHECK_PERIOD_MS 500
 #define WATCHDOG_TIMEOUT_MS 2000u
-#define STACK_SIZE 1024
+#define STACK_SIZE 1536
 /* The lowest application priority: a thread running away above it starves the check too, so
  * the watchdog catches that as well as a hang. */
 #define PRIORITY K_LOWEST_APPLICATION_THREAD_PRIO
@@ -41,6 +42,7 @@ static void supervise(void *unused1, void *unused2, void *unused3)
     ARG_UNUSED(unused1);
     ARG_UNUSED(unused2);
     bool reported = false;
+    bool was_stalled = false;
 
     ARG_UNUSED(unused3);
     for (;;) {
@@ -51,6 +53,11 @@ static void supervise(void *unused1, void *unused2, void *unused3)
         const bool stalled = supervision_stalled(&supervision, k_uptime_get_32());
 
         k_spin_unlock(&lock, key);
+        if (stalled != was_stalled) {
+            (void)event_log_record(
+                stalled ? SECURITY_EVENT_SENSOR_STOPPED : SECURITY_EVENT_SENSOR_RESUMED, NULL, 0u);
+            was_stalled = stalled;
+        }
         /* Reported at once, then every other check: once a second, the rate readings come at. */
         if (stalled && !reported) {
             stall_handler();

@@ -4,8 +4,11 @@
 #include "limits_signer.h"
 #include "medsec_bt.h"
 #include "plx.h"
+#include "security_log.h"
 
 #include <errno.h>
+#include <stdio.h>
+#include <string.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
@@ -26,6 +29,7 @@ static const struct bt_uuid_16 continuous_measurement = BT_UUID_INIT_16(BT_UUID_
 static const struct bt_uuid_128 alarm_limits = BT_UUID_INIT_128(MEDSEC_ALARM_LIMITS_VAL);
 static const struct bt_uuid_128 alarm_state = BT_UUID_INIT_128(MEDSEC_ALARM_STATE_VAL);
 static const struct bt_uuid_128 alarm_challenge = BT_UUID_INIT_128(MEDSEC_ALARM_CHALLENGE_VAL);
+static const struct bt_uuid_128 security_log = BT_UUID_INIT_128(MEDSEC_SECURITY_LOG_VAL);
 
 static struct bt_conn *oximeter;
 static struct bt_gatt_discover_params discover_params;
@@ -33,6 +37,7 @@ static uint16_t measurement_handle;
 static uint16_t limits_handle;
 static uint16_t state_handle;
 static uint16_t challenge_handle;
+static uint16_t log_handle;
 
 /* Each subscription finds its own CCC descriptor, so each needs its own discovery parameters. */
 static struct bt_gatt_subscribe_params measurement_subscription;
@@ -121,14 +126,14 @@ static void subscribe(struct bt_conn *conn, struct bt_gatt_subscribe_params *sub
     }
 }
 
-/* One pass over every characteristic, noting the four the hub uses; then subscribe. */
+/* One pass over every characteristic, noting the five the hub uses; then subscribe. */
 static uint8_t on_characteristic(struct bt_conn *conn, const struct bt_gatt_attr *attr,
                                  struct bt_gatt_discover_params *params)
 {
     ARG_UNUSED(params);
     if (attr == NULL) {
         if ((measurement_handle == 0u) || (limits_handle == 0u) || (state_handle == 0u) ||
-            (challenge_handle == 0u)) {
+            (challenge_handle == 0u) || (log_handle == 0u)) {
             LOG_WRN("not a pulse oximeter this hub knows");
             return BT_GATT_ITER_STOP;
         }
@@ -149,6 +154,8 @@ static uint8_t on_characteristic(struct bt_conn *conn, const struct bt_gatt_attr
         state_handle = characteristic->value_handle;
     } else if (bt_uuid_cmp(characteristic->uuid, &alarm_challenge.uuid) == 0) {
         challenge_handle = characteristic->value_handle;
+    } else if (bt_uuid_cmp(characteristic->uuid, &security_log.uuid) == 0) {
+        log_handle = characteristic->value_handle;
     }
     return BT_GATT_ITER_CONTINUE;
 }
@@ -251,6 +258,134 @@ static int cmd_limits(const struct shell *sh, size_t argc, char **argv)
     }
     return 0;
 }
+
+/* The log arrives in pieces, as long as the link allows; it's printed once it's all here. */
+static struct bt_gatt_read_params log_read;
+static uint8_t log_records[SECURITY_LOG_CAPACITY * SECURITY_LOG_RECORD_SIZE];
+static size_t log_length;
+
+static const char *refusal(uint8_t reason)
+{
+    switch (reason) {
+    case LIMITS_AUTH_WRONG_LENGTH:
+        return "wrong length";
+    case LIMITS_AUTH_NO_CHALLENGE:
+        return "no fresh challenge";
+    case LIMITS_AUTH_INVALID_LIMITS:
+        return "limits a monitor wouldn't accept";
+    case LIMITS_AUTH_BAD_TAG:
+        return "tag doesn't match";
+    default:
+        return "unknown reason";
+    }
+}
+
+static void describe(const security_record_t *record, char *text, size_t size)
+{
+    const uint8_t *detail = record->detail;
+    alarm_limits_t limits;
+
+    switch (record->event) {
+    case SECURITY_EVENT_START:
+        (void)snprintf(text, size, "started (reset cause 0x%08x)",
+                       (unsigned int)sys_get_le32(detail));
+        break;
+    case SECURITY_EVENT_CONNECTED:
+        (void)snprintf(text, size, "connected: %02X:%02X:%02X:%02X:%02X:%02X (%s)", detail[6],
+                       detail[5], detail[4], detail[3], detail[2], detail[1],
+                       (detail[0] == BT_ADDR_LE_PUBLIC) ? "public" : "random");
+        break;
+    case SECURITY_EVENT_DISCONNECTED:
+        (void)snprintf(text, size, "disconnected (reason 0x%02x)", detail[0]);
+        break;
+    case SECURITY_EVENT_LIMITS_ACCEPTED:
+        if (alarm_limits_decode(detail, ALARM_LIMITS_SIZE, &limits)) {
+            (void)snprintf(text, size,
+                           "limits accepted: SpO2 below %u%%, pulse below %u or above %u bpm",
+                           limits.spo2_low_percent, limits.pulse_low_bpm, limits.pulse_high_bpm);
+        } else {
+            (void)snprintf(text, size, "limits accepted: malformed record");
+        }
+        break;
+    case SECURITY_EVENT_LIMITS_REFUSED:
+        (void)snprintf(text, size, "limits refused: %s", refusal(detail[0]));
+        break;
+    case SECURITY_EVENT_LIMITS_UNSAVED:
+        (void)snprintf(text, size, "limits refused: couldn't save them");
+        break;
+    case SECURITY_EVENT_SENSOR_STOPPED:
+        (void)snprintf(text, size, "sensor stopped sending samples");
+        break;
+    default:
+        (void)snprintf(text, size, "sensor sending samples again");
+        break;
+    }
+}
+
+static void print_log(void)
+{
+    for (size_t at = 0u; (at + SECURITY_LOG_RECORD_SIZE) <= log_length;
+         at += SECURITY_LOG_RECORD_SIZE) {
+        security_record_t record;
+        char text[80];
+
+        if (!security_log_decode(&log_records[at], SECURITY_LOG_RECORD_SIZE, &record)) {
+            LOG_WRN("malformed security record ignored");
+            continue;
+        }
+        describe(&record, text, sizeof text);
+        LOG_INF("#%u boot %u +%u.%03u s: %s", (unsigned int)record.sequence, record.boot,
+                (unsigned int)(record.uptime_ms / 1000u), (unsigned int)(record.uptime_ms % 1000u),
+                text);
+    }
+    LOG_INF("%u security records", (unsigned int)(log_length / SECURITY_LOG_RECORD_SIZE));
+}
+
+static uint8_t on_log(struct bt_conn *conn, uint8_t err, struct bt_gatt_read_params *params,
+                      const void *data, uint16_t length)
+{
+    ARG_UNUSED(conn);
+    ARG_UNUSED(params);
+    if (err != 0u) {
+        LOG_WRN("reading the security log failed (ATT error 0x%02x)", err);
+        return BT_GATT_ITER_STOP;
+    }
+    if (data == NULL) {
+        print_log();
+        return BT_GATT_ITER_STOP;
+    }
+    if ((log_length + length) > sizeof log_records) {
+        LOG_WRN("security log longer than expected; the rest is ignored");
+        return BT_GATT_ITER_STOP;
+    }
+    (void)memcpy(&log_records[log_length], data, length);
+    log_length += length;
+    return BT_GATT_ITER_CONTINUE;
+}
+
+static int cmd_log(const struct shell *sh, size_t argc, char **argv)
+{
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+    if ((oximeter == NULL) || (log_handle == 0u)) {
+        shell_error(sh, "no oximeter connected");
+        return -ENOTCONN;
+    }
+    log_length = 0u;
+    log_read.func = on_log;
+    log_read.handle_count = 1u;
+    log_read.single.handle = log_handle;
+    log_read.single.offset = 0u;
+
+    const int err = bt_gatt_read(oximeter, &log_read);
+
+    if (err != 0) {
+        shell_error(sh, "reading the security log failed: %d", err);
+    }
+    return err;
+}
+
+SHELL_CMD_REGISTER(log, NULL, "Print the oximeter's security event log, oldest first", cmd_log);
 
 SHELL_CMD_ARG_REGISTER(limits, NULL,
                        "Set the oximeter's alarm limits: limits <SpO2 low %> <pulse low bpm> "

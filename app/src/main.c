@@ -1,4 +1,5 @@
 #include "alarm_service.h"
+#include "event_log.h"
 #include "oximetry.h"
 #include "plx_service.h"
 #include "supervisor.h"
@@ -71,6 +72,10 @@ int main(void)
     };
 
     LOG_INF("medsec-oximeter started");
+    /* Monitoring goes on without the log if it can't start. */
+    if (event_log_start() != 0) {
+        LOG_ERR("security event log unavailable");
+    }
     oximetry_init(&oximetry);
     if (alarm_service_init() != 0) {
         LOG_ERR("could not set up the alarm LED");
