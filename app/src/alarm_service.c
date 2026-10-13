@@ -27,7 +27,10 @@ static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
 /* The limits are written from the Bluetooth thread and read from the sensor thread. */
 static struct k_spinlock lock;
 static alarm_limits_t limits;
-static uint8_t state; /* ALARM_* bits; written only from the sensor thread */
+/* Readings come from the sensor's thread, and "no reading" from the supervisor's when the sensor
+ * stops. */
+static K_MUTEX_DEFINE(update_lock);
+static uint8_t state; /* ALARM_* bits, under update_lock */
 
 /* Used only on the Bluetooth receive thread (CONFIG_BT_RECV_WORKQ_BT), which runs the GATT and
  * connection callbacks, after alarm_service_init: no lock needed. */
@@ -167,17 +170,18 @@ void alarm_service_update(const oximetry_reading_t *reading)
 
     const uint8_t alarms = alarm_check(&current, reading);
 
+    (void)k_mutex_lock(&update_lock, K_FOREVER);
     (void)gpio_pin_set_dt(&led, (alarms != 0u) ? 1 : 0);
-    if (alarms == state) {
-        return;
-    }
-    state = alarms;
-    log_alarms(alarms);
+    if (alarms != state) {
+        state = alarms;
+        log_alarms(alarms);
 
-    const int err = bt_gatt_notify(NULL, ALARM_STATE, &state, sizeof state);
+        const int err = bt_gatt_notify(NULL, ALARM_STATE, &state, sizeof state);
 
-    /* -ENOTCONN only means no central is listening. */
-    if ((err != 0) && (err != -ENOTCONN)) {
-        LOG_WRN("alarm notification failed: %d", err);
+        /* -ENOTCONN only means no central is listening. */
+        if ((err != 0) && (err != -ENOTCONN)) {
+            LOG_WRN("alarm notification failed: %d", err);
+        }
     }
+    k_mutex_unlock(&update_lock);
 }

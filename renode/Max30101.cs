@@ -105,6 +105,18 @@ namespace Antmicro.Renode.Peripherals.Sensors
 
         public uint InfraredPulse { get; set; }
 
+        // Stops the sensor taking samples, as a fault or a broken connection would. It stays
+        // stopped through the chip's own reset, as a broken sensor would.
+        public bool Stopped
+        {
+            get => stopped;
+            set
+            {
+                stopped = value;
+                Reconfigure();
+            }
+        }
+
         private void Advance()
         {
             // Reads of FIFO_DATA stay on it, so a burst read drains whole samples.
@@ -207,7 +219,7 @@ namespace Antmicro.Renode.Peripherals.Sensors
             // On-chip averaging decimates: 4-sample averaging at 400 sps fills the FIFO at 100 sps.
             var averaged = SampleRates[(spo2Config >> 2) & 0x07] >> Math.Min((fifoConfig >> 5) & 0x07, 5);
             sampler.Frequency = (ulong)Math.Max(averaged, 1);
-            sampler.Enabled = running;
+            sampler.Enabled = running && !stopped;
         }
 
         private void TakeSample()
@@ -290,6 +302,7 @@ namespace Antmicro.Renode.Peripherals.Sensors
         private byte modeConfig;
         private byte spo2Config;
         private ulong sampleIndex;
+        private bool stopped;
 
         private readonly LimitTimer sampler;
         private readonly Sample[] fifo;

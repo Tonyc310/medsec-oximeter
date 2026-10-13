@@ -68,3 +68,29 @@ Keeps The Clinician's Limits Through A Reset
     Wait For Line On Uart     alarm limits: SpO2 below 95%    testerId=${oximeter}
     Wait For Line On Uart     ALARM: SpO2 low    testerId=${oximeter}    timeout=10
     Assert LED State          true
+
+Raises The Technical Alarm When The Sensor Stops
+    Start System
+    Monitor A Patient At 94 Percent
+
+    # Without samples there's nothing to measure: the oximeter must say so, not fall silent. The
+    # LED times it, as log lines can trail by up to a second.
+    Execute Command           ${SENSOR} Stopped true
+    Assert LED State          true    timeout=2
+    Wait For Line On Uart     ALARM from oximeter: no pulse found    testerId=${hub}
+    Wait For Line On Uart     hub: no reading    testerId=${hub}
+
+Recovers From A Hang Through The Watchdog
+    Start System
+    Monitor A Patient At 94 Percent
+    Write Line To Uart        limits 95 50 120    testerId=${hub}
+    Wait For Line On Uart     oximeter accepted the alarm limits    testerId=${hub}
+
+    # The processor stops, as in a hang: the watchdog resets it, and it measures again under the
+    # clinician's limits.
+    ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
+    Execute Command           mach set "oximeter"
+    Execute Command           cpu IsHalted true
+    Wait For Line On Uart     alarm limits: SpO2 below 95%    testerId=${oximeter}    timeout=5
+    Wait For Line On Uart     SpO2 94%, pulse (89|90|91) bpm    testerId=${oximeter}    treatAsRegex=true    timeout=10
+    Assert LED State          true

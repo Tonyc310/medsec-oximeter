@@ -1,6 +1,7 @@
 #include "alarm_service.h"
 #include "oximetry.h"
 #include "plx_service.h"
+#include "supervisor.h"
 
 #include <zephyr/device.h>
 #include <zephyr/drivers/sensor.h>
@@ -31,6 +32,7 @@ static void on_sample(const struct device *dev, const struct sensor_trigger *tri
         LOG_WRN("sample lost");
         return;
     }
+    supervisor_sample();
 
     /* The driver reports 18-bit counts, never negative. */
     const oximetry_sample_t sample = {
@@ -50,6 +52,17 @@ static void on_sample(const struct device *dev, const struct sensor_trigger *tri
     alarm_service_update(&reading);
 }
 
+/* With no samples there's nothing to measure, so a stopped sensor reads as no reading: the
+ * technical alarm sounds and the hub hears it, rather than everything falling silent. */
+static void on_stall(void)
+{
+    static const oximetry_reading_t none = {.valid = false};
+
+    LOG_WRN("no samples from the sensor");
+    plx_service_send(&none);
+    alarm_service_update(&none);
+}
+
 int main(void)
 {
     static const struct sensor_trigger data_ready = {
@@ -58,10 +71,6 @@ int main(void)
     };
 
     LOG_INF("medsec-oximeter started");
-    if (!device_is_ready(sensor)) {
-        LOG_ERR("pulse oximetry sensor not found");
-        return 0;
-    }
     oximetry_init(&oximetry);
     if (alarm_service_init() != 0) {
         LOG_ERR("could not set up the alarm LED");
@@ -71,8 +80,13 @@ int main(void)
         LOG_ERR("could not start Bluetooth");
         return 0;
     }
-    if (sensor_trigger_set(sensor, &data_ready, on_sample) != 0) {
-        LOG_ERR("could not enable the sensor's data-ready interrupt");
+    /* Started before the sensor, so a sensor that never sends a sample raises the alarm too. */
+    if (supervisor_start(on_stall) != 0) {
+        LOG_ERR("could not start the watchdog");
+        return 0;
+    }
+    if (!device_is_ready(sensor) || (sensor_trigger_set(sensor, &data_ready, on_sample) != 0)) {
+        LOG_ERR("pulse oximetry sensor not working");
     }
     return 0;
 }
