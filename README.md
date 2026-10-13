@@ -94,7 +94,7 @@ clang-tidy -p build/host core/src/*.c
 cppcheck --std=c11 --enable=warning,style,performance,portability -I core/include core/src
 ```
 
-The unit tests cover the oximetry analysis, the PLX encoder and decoder, the alarm checks and limit settings, the checks on signed limit changes, the check that the sensor keeps sending samples, and the security event log's records and numbering. Code that needs Zephyr runs its tests as Zephyr programs on the PC (`native_sim`): the PSA Crypto binding that gives those checks HMAC-SHA-256, against RFC 4231's test vectors; the hub's signer, against the oximeter's own checks; and the storage that keeps the alarm limits through a reset, on simulated flash:
+The unit tests cover the oximetry analysis, the PLX encoder and decoder, the alarm checks and limit settings, the checks on signed limit changes, the check that the sensor keeps sending samples, and the security event log's records and numbering. Code that needs Zephyr runs its tests as Zephyr programs on the PC (`native_sim`): the PSA Crypto binding that gives those checks HMAC-SHA-256, against RFC 4231's test vectors; the hub's signer, against the oximeter's own checks; and the storage that keeps the alarm limits and the security event log through a reset, on simulated flash:
 
 ```bash
 west build -b native_sim/native/64 -d build/limits_crypto app/tests/limits_crypto
@@ -103,6 +103,8 @@ west build -b native_sim/native/64 -d build/limits_signer hub/tests/limits_signe
 build/limits_signer/zephyr/zephyr.exe
 west build -b native_sim/native/64 -d build/limits_store app/tests/limits_store
 build/limits_store/zephyr/zephyr.exe -flash_in_ram
+west build -b native_sim/native/64 -d build/event_log app/tests/event_log
+build/event_log/zephyr/zephyr.exe -flash_in_ram
 ```
 
 The Robot Framework tests boot both boards in [Renode](https://renode.io) 1.17, joined by a simulated Bluetooth link, with the sensor model set to a patient (90 bpm, 94%). The first checks the hub receives that reading and the alarm LED stays off, then sets a 95% limit from the hub's shell and checks the oximeter accepts the signed change, alarms, and lights the LED. The second runs the same hub built with a key of its own, as a gateway that wasn't given this oximeter's key, and checks the oximeter refuses its change and keeps monitoring under the old limits. The third sets the limits, resets the oximeter, and checks it starts with them and alarms again. The fourth stops the sensor and checks the technical alarm comes on within 2 s and the hub hears "no reading"; the fifth stops the processor and checks the watchdog brings the oximeter back, measuring under the clinician's limits. They need `renode-test` on `PATH` with its Python packages (`pip install -r <renode>/tests/requirements.txt`), and write their report to the working directory, so run them from the build tree:
