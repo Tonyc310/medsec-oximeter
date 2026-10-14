@@ -15,6 +15,7 @@ manifest:
         name-allowlist:
           - cmsis_6     # CMSIS-Core for Cortex-M
           - hal_nordic  # nrfx drivers and the nRF devicetree bindings
+          - mcuboot     # the bootloader that checks image signatures
           # Mbed TLS and TF-PSA-Crypto, which provides the PSA Crypto API.
           - mbedtls
           - tf-psa-crypto

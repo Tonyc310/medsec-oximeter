@@ -2,7 +2,7 @@
 Library                     Process
 
 *** Variables ***
-${OXIMETER_ELF}             ${CURDIR}/../build/oximeter/zephyr/zephyr.elf
+${OXIMETER_IMAGE}           ${CURDIR}/../build/oximeter/app/zephyr/zephyr.signed.hex
 ${HUB_ELF}                  ${CURDIR}/../build/hub/zephyr/zephyr.elf
 # The same hub built with a master of its own, as a gateway that can't make this oximeter's key.
 ${HUB_OTHER_KEY_ELF}        ${CURDIR}/../build/hub-other-key/zephyr/zephyr.elf
@@ -23,7 +23,7 @@ Start System
     ${result}=                Run Process    python3    ${CURDIR}/../tools/provision.py
     ...                       --master    ${MASTER}    --device-id    ${DEVICE_ID}    --renode    ${PROVISIONED}
     Should Be Equal As Integers    ${result.rc}    0    ${result.stderr}
-    Execute Command           $oximeter_bin=@${OXIMETER_ELF}
+    Execute Command           $oximeter_image=@${OXIMETER_IMAGE}
     Execute Command           $hub_bin=@${hub_elf}
     Execute Command           $provisioning=@${provisioning}
     Execute Script            ${SCRIPT}

@@ -8,6 +8,7 @@
 
 #include <mbedtls/platform_util.h>
 #include <zephyr/device.h>
+#include <zephyr/dfu/mcuboot.h>
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/logging/log.h>
 
@@ -67,6 +68,21 @@ static void on_stall(void)
     alarm_service_update(&none);
 }
 
+/* The version MCUboot checked: from the signed header of the slot this image runs from. */
+static void log_start(void)
+{
+    struct mcuboot_img_header header;
+
+    if (boot_read_bank_header(boot_fetch_active_slot(), &header, sizeof header) != 0) {
+        LOG_INF("medsec-oximeter started; its image header can't be read");
+        return;
+    }
+    const struct mcuboot_img_sem_ver *const version = &header.h.v1.sem_ver;
+
+    LOG_INF("medsec-oximeter %u.%u.%u+%u started", version->major, version->minor,
+            version->revision, version->build_num);
+}
+
 /* Before the log starts, so even the start-up record is tagged. Without a key, records are still
  * kept, with tags that verify against nothing. */
 static void load_log_key(void)
@@ -86,7 +102,7 @@ int main(void)
         .chan = SENSOR_CHAN_RED,
     };
 
-    LOG_INF("medsec-oximeter started");
+    log_start();
     load_log_key();
     /* Monitoring goes on without the log if it can't start. */
     if (event_log_start() != 0) {

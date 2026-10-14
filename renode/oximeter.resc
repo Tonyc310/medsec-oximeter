@@ -1,7 +1,8 @@
 :name: medsec-oximeter
 :description: The pulse oximeter (nRF52840 DK with a MAX30101) and a hub on a second nRF52840, joined by Bluetooth LE.
 
-$oximeter_bin?=$ORIGIN/../build/oximeter/zephyr/zephyr.elf
+$oximeter_image?=$ORIGIN/../build/oximeter/app/zephyr/zephyr.signed.hex
+$bootloader_bin?=$ORIGIN/../build/oximeter/mcuboot/zephyr/zephyr.elf
 $hub_bin?=$ORIGIN/../build/hub/zephyr/zephyr.elf
 
 # The models are compiled when they're loaded, so they have to come before the platform.
@@ -10,17 +11,14 @@ include $ORIGIN/Nvmc.cs
 
 emulation CreateBLEMedium "wireless"
 
-# A macro belongs to the machine selected when it's defined, and runs when that machine resets:
-# each machine reloads only its own firmware, so one can reset while the other runs on.
+# Firmware is loaded once, as a factory programs the flash. A reset then starts whatever the flash
+# holds, as on the chip, so an image MCUboot has swapped in stays there.
 mach create "oximeter"
 machine LoadPlatformDescription $ORIGIN/nrf52840dk-oximeter.repl
 connector Connect sysbus.radio wireless
 showAnalyzer sysbus.uart0
-macro reset
-"""
-    sysbus LoadELF $oximeter_bin
-"""
-runMacro $reset
+sysbus LoadHEX $oximeter_image
+sysbus LoadELF $bootloader_bin
 
 # The factory's step: the oximeter's limits key into UICR. Make it with tools/provision.py.
 $provisioning?=$ORIGIN/../build/provision.resc
@@ -30,11 +28,7 @@ mach create "hub"
 machine LoadPlatformDescription @platforms/boards/nrf52840dk_nrf52840.repl
 connector Connect sysbus.radio wireless
 showAnalyzer sysbus.uart0
-macro reset
-"""
-    sysbus LoadELF $hub_bin
-"""
-runMacro $reset
+sysbus LoadELF $hub_bin
 
 # The two Bluetooth stacks need the machines kept within 10 us of each other.
 emulation SetGlobalQuantum "0.00001"
