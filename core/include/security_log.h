@@ -25,9 +25,10 @@ typedef enum {
         6, /* detail: the limits, refused because they couldn't be saved */
     SECURITY_EVENT_SENSOR_STOPPED = 7,
     SECURITY_EVENT_SENSOR_RESUMED = 8,
+    SECURITY_EVENT_NO_DEVICE_KEY = 9, /* at start-up: none provisioned, so no limits change works */
 } security_event_t;
 
-#define SECURITY_EVENT_LAST SECURITY_EVENT_SENSOR_RESUMED
+#define SECURITY_EVENT_LAST SECURITY_EVENT_NO_DEVICE_KEY
 
 typedef struct {
     uint32_t sequence; /* from 1 */

@@ -96,7 +96,7 @@ clang-tidy -p build/host core/src/*.c
 cppcheck --std=c11 --enable=warning,style,performance,portability -I core/include core/src
 ```
 
-The unit tests cover the oximetry analysis, the PLX encoder and decoder, the alarm checks and limit settings, the checks on signed limit changes, the check that the sensor keeps sending samples, and the security event log's records and numbering. Code that needs Zephyr runs its tests as Zephyr programs on the PC (`native_sim`): the PSA Crypto binding that gives those checks HMAC-SHA-256, against RFC 4231's test vectors; the hub's signer, against the oximeter's own checks; and the storage that keeps the alarm limits and the security event log through a reset, on simulated flash:
+The unit tests cover the oximetry analysis, the PLX encoder and decoder, the alarm checks and limit settings, the checks on signed limit changes, the check that the sensor keeps sending samples, the security event log's records and numbering, and the check that a device key was provisioned. Code that needs Zephyr runs its tests as Zephyr programs on the PC (`native_sim`): the PSA Crypto binding that gives those checks HMAC-SHA-256, against RFC 4231's test vectors; the hub's signer, against the oximeter's own checks; and the storage that keeps the alarm limits and the security event log through a reset, on simulated flash:
 
 ```bash
 west build -b native_sim/native/64 -d build/limits_crypto app/tests/limits_crypto

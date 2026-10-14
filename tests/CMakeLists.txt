@@ -6,7 +6,7 @@ FetchContent_Declare(unity
     SYSTEM)
 FetchContent_MakeAvailable(unity)
 
-foreach(module alarm limits_auth oximetry plx security_log supervision)
+foreach(module alarm device_key limits_auth oximetry plx security_log supervision)
     add_executable(test_${module} test_${module}.c)
     target_link_libraries(test_${module} PRIVATE core unity project_warnings)
     add_test(NAME ${module} COMMAND test_${module})
