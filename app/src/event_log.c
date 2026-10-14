@@ -1,5 +1,7 @@
 #include "event_log.h"
 
+#include "log_mac.h"
+
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -20,21 +22,27 @@ static K_MUTEX_DEFINE(lock);
 static security_log_t security;
 static uint16_t boot;
 /* What flash holds, by slot, so reading the log needs no flash access. */
-static security_record_t records[SECURITY_LOG_CAPACITY];
+static struct {
+    security_record_t record;
+    uint8_t tag[SECURITY_LOG_TAG_SIZE];
+} entries[SECURITY_LOG_CAPACITY];
 
 /* Only a complete read is decoded (CERT EXP33-C); the decoder refuses anything malformed. */
 static int on_record(const char *key, size_t length, settings_read_cb read, void *read_arg,
                      void *param)
 {
-    uint8_t stored[SECURITY_LOG_RECORD_SIZE];
+    uint8_t stored[SECURITY_LOG_ENTRY_SIZE];
     security_record_t record;
 
     ARG_UNUSED(key);
     ARG_UNUSED(param);
-    if ((read(read_arg, stored, sizeof stored) == (ssize_t)length) &&
-        security_log_decode(stored, length, &record)) {
-        security_log_restore(&security, stored, length);
-        records[(record.sequence - 1u) % SECURITY_LOG_CAPACITY] = record;
+    if ((length == sizeof stored) && (read(read_arg, stored, sizeof stored) == (ssize_t)length) &&
+        security_log_decode(stored, SECURITY_LOG_RECORD_SIZE, &record)) {
+        const uint32_t slot = (record.sequence - 1u) % SECURITY_LOG_CAPACITY;
+
+        security_log_restore(&security, stored, SECURITY_LOG_RECORD_SIZE);
+        entries[slot].record = record;
+        (void)memcpy(entries[slot].tag, &stored[SECURITY_LOG_RECORD_SIZE], SECURITY_LOG_TAG_SIZE);
     }
     return 0;
 }
@@ -55,7 +63,7 @@ static int on_boot(const char *key, size_t length, settings_read_cb read, void *
 static int load(void)
 {
     security_log_init(&security);
-    (void)memset(records, 0, sizeof records);
+    (void)memset(entries, 0, sizeof entries);
     boot = 0u;
 
     int err = settings_load_subtree_direct(LOG_KEY, on_record, NULL);
@@ -98,7 +106,7 @@ int event_log_start(void)
 int event_log_record(security_event_t event, const void *detail, size_t length)
 {
     security_record_t record = {.uptime_ms = k_uptime_get_32(), .event = (uint8_t)event};
-    uint8_t encoded[SECURITY_LOG_RECORD_SIZE];
+    uint8_t stored[SECURITY_LOG_ENTRY_SIZE];
     char key[sizeof(LOG_KEY "/63")];
 
     if (length > SECURITY_LOG_DETAIL_SIZE) {
@@ -112,11 +120,17 @@ int event_log_record(security_event_t event, const void *detail, size_t length)
     const uint32_t slot = security_log_next(&security, &record);
 
     record.boot = boot;
-    records[slot] = record;
-    security_log_encode(&record, encoded);
+    security_log_encode(&record, stored);
+    /* Without a log key the record is still kept, with a tag of zeros: it shows as unverifiable
+     * rather than going missing. */
+    if (!log_mac_tag(stored, SECURITY_LOG_RECORD_SIZE, &stored[SECURITY_LOG_RECORD_SIZE])) {
+        (void)memset(&stored[SECURITY_LOG_RECORD_SIZE], 0, SECURITY_LOG_TAG_SIZE);
+    }
+    entries[slot].record = record;
+    (void)memcpy(entries[slot].tag, &stored[SECURITY_LOG_RECORD_SIZE], SECURITY_LOG_TAG_SIZE);
     (void)snprintf(key, sizeof key, LOG_KEY "/%u", (unsigned int)slot);
 
-    const int err = settings_save_one(key, encoded, sizeof encoded);
+    const int err = settings_save_one(key, stored, sizeof stored);
 
     k_mutex_unlock(&lock);
     /* Callers carry on: the event still reaches the console, and the gap in numbering shows. */
@@ -133,9 +147,13 @@ size_t event_log_read(uint8_t *out, size_t size)
     (void)k_mutex_lock(&lock, K_FOREVER);
     const uint32_t count = security_log_count(&security);
 
-    for (uint32_t i = 0u; (i < count) && ((copied + SECURITY_LOG_RECORD_SIZE) <= size); i++) {
-        security_log_encode(&records[security_log_slot(&security, i)], &out[copied]);
-        copied += SECURITY_LOG_RECORD_SIZE;
+    for (uint32_t i = 0u; (i < count) && ((copied + SECURITY_LOG_ENTRY_SIZE) <= size); i++) {
+        const uint32_t slot = security_log_slot(&security, i);
+
+        security_log_encode(&entries[slot].record, &out[copied]);
+        (void)memcpy(&out[copied + SECURITY_LOG_RECORD_SIZE], entries[slot].tag,
+                     SECURITY_LOG_TAG_SIZE);
+        copied += SECURITY_LOG_ENTRY_SIZE;
     }
     k_mutex_unlock(&lock);
     return copied;

@@ -314,7 +314,7 @@ static int cmd_limits(const struct shell *sh, size_t argc, char **argv)
 
 /* The log arrives in pieces, as long as the link allows; it's printed once it's all here. */
 static struct bt_gatt_read_params log_read;
-static uint8_t log_records[SECURITY_LOG_CAPACITY * SECURITY_LOG_RECORD_SIZE];
+static uint8_t log_entries[SECURITY_LOG_CAPACITY * SECURITY_LOG_ENTRY_SIZE];
 static size_t log_length;
 
 static const char *refusal(uint8_t reason)
@@ -383,12 +383,12 @@ static void describe(const security_record_t *record, char *text, size_t size)
 
 static void print_log(void)
 {
-    for (size_t at = 0u; (at + SECURITY_LOG_RECORD_SIZE) <= log_length;
-         at += SECURITY_LOG_RECORD_SIZE) {
+    for (size_t at = 0u; (at + SECURITY_LOG_ENTRY_SIZE) <= log_length;
+         at += SECURITY_LOG_ENTRY_SIZE) {
         security_record_t record;
         char text[80];
 
-        if (!security_log_decode(&log_records[at], SECURITY_LOG_RECORD_SIZE, &record)) {
+        if (!security_log_decode(&log_entries[at], SECURITY_LOG_RECORD_SIZE, &record)) {
             LOG_WRN("malformed security record ignored");
             continue;
         }
@@ -397,7 +397,7 @@ static void print_log(void)
                 (unsigned int)(record.uptime_ms / 1000u), (unsigned int)(record.uptime_ms % 1000u),
                 text);
     }
-    LOG_INF("%u security records", (unsigned int)(log_length / SECURITY_LOG_RECORD_SIZE));
+    LOG_INF("%u security records", (unsigned int)(log_length / SECURITY_LOG_ENTRY_SIZE));
 }
 
 static uint8_t on_log(struct bt_conn *conn, uint8_t err, struct bt_gatt_read_params *params,
@@ -413,11 +413,11 @@ static uint8_t on_log(struct bt_conn *conn, uint8_t err, struct bt_gatt_read_par
         print_log();
         return BT_GATT_ITER_STOP;
     }
-    if ((log_length + length) > sizeof log_records) {
+    if ((log_length + length) > sizeof log_entries) {
         LOG_WRN("security log longer than expected; the rest is ignored");
         return BT_GATT_ITER_STOP;
     }
-    (void)memcpy(&log_records[log_length], data, length);
+    (void)memcpy(&log_entries[log_length], data, length);
     log_length += length;
     return BT_GATT_ITER_CONTINUE;
 }

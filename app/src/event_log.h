@@ -14,7 +14,8 @@ int event_log_start(void);
  * Returns 0 or -errno. */
 int event_log_record(security_event_t event, const void *detail, size_t length);
 
-/** Copies the log into `out`, oldest record first, and returns the number of bytes copied. */
+/** Copies the log into `out`, oldest entry first, and returns the number of bytes copied. Each
+ * entry is a record and its tag: SECURITY_LOG_ENTRY_SIZE bytes. */
 size_t event_log_read(uint8_t *out, size_t size);
 
 #endif

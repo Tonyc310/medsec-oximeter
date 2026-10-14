@@ -110,14 +110,14 @@ static ssize_t read_challenge(struct bt_conn *conn, const struct bt_gatt_attr *a
                              LIMITS_AUTH_CHALLENGE_SIZE);
 }
 
-/* The whole log, oldest record first; a central reads it in pieces, at increasing offsets. */
+/* The whole log, oldest entry first; a central reads it in pieces, at increasing offsets. */
 static ssize_t read_log(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf,
                         uint16_t len, uint16_t offset)
 {
-    static uint8_t records[SECURITY_LOG_CAPACITY * SECURITY_LOG_RECORD_SIZE];
-    const size_t length = event_log_read(records, sizeof records);
+    static uint8_t entries[SECURITY_LOG_CAPACITY * SECURITY_LOG_ENTRY_SIZE];
+    const size_t length = event_log_read(entries, sizeof entries);
 
-    return bt_gatt_attr_read(conn, attr, buf, len, offset, records, (uint16_t)length);
+    return bt_gatt_attr_read(conn, attr, buf, len, offset, entries, (uint16_t)length);
 }
 
 static ssize_t read_device_id(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf,
