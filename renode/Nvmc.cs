@@ -52,7 +52,7 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
                 {
                     if(value)
                     {
-                        this.Log(LogLevel.Warning, "UICR isn't modeled; ERASEUICR does nothing");
+                        this.Log(LogLevel.Warning, "Erasing UICR isn't modeled; ERASEUICR does nothing");
                     }
                 }, name: "ERASEUICR")
                 .WithReservedBits(1, 31);

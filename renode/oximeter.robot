@@ -1,18 +1,31 @@
+*** Settings ***
+Library                     Process
+
 *** Variables ***
 ${OXIMETER_ELF}             ${CURDIR}/../build/oximeter/zephyr/zephyr.elf
 ${HUB_ELF}                  ${CURDIR}/../build/hub/zephyr/zephyr.elf
-# The same hub built with a key of its own, as a gateway that wasn't given this oximeter's key.
+# The same hub built with a master of its own, as a gateway that can't make this oximeter's key.
 ${HUB_OTHER_KEY_ELF}        ${CURDIR}/../build/hub-other-key/zephyr/zephyr.elf
 ${SCRIPT}                   ${CURDIR}/oximeter.resc
+${MASTER}                   ${CURDIR}/../build/limits-master.key
+# The simulated oximeter's ID: the FICR DEVICEID values in nrf52840dk-oximeter.repl.
+${DEVICE_ID}                0123456789abcdef
+${PROVISIONED}              ${CURDIR}/../build/renode/provision.resc
+${UNPROVISIONED}            ${CURDIR}/unprovisioned.resc
 ${UART}                     sysbus.uart0
 ${SENSOR}                   sysbus.twi0.max30101
 ${ALARM_LED}                sysbus.gpio0.led0
 
 *** Keywords ***
 Start System
-    [Arguments]               ${hub_elf}=${HUB_ELF}
+    [Arguments]               ${hub_elf}=${HUB_ELF}    ${provisioning}=${PROVISIONED}
+    # The factory derives the oximeter's key from the master and its ID, as the hub does.
+    ${result}=                Run Process    python3    ${CURDIR}/../tools/provision.py
+    ...                       --master    ${MASTER}    --device-id    ${DEVICE_ID}    --renode    ${PROVISIONED}
+    Should Be Equal As Integers    ${result.rc}    0    ${result.stderr}
     Execute Command           $oximeter_bin=@${OXIMETER_ELF}
     Execute Command           $hub_bin=@${hub_elf}
+    Execute Command           $provisioning=@${provisioning}
     Execute Script            ${SCRIPT}
     ${hub}=                   Create Terminal Tester    ${UART}    machine=hub
     Set Test Variable         ${hub}
@@ -115,3 +128,12 @@ Logs A Refused Change From A Hub Without Its Key
     # Anyone in range can read the log until pairing, the stranger included.
     Write Line To Uart        log    testerId=${hub}
     Wait For Line On Uart     \#3 boot 1 \\+[0-9.]+ s: limits refused: tag doesn't match    testerId=${hub}    treatAsRegex=true
+
+Refuses Every Change Without A Device Key
+    Start System              provisioning=${UNPROVISIONED}
+    Monitor A Patient At 94 Percent
+    Write Line To Uart        limits 95 50 120    testerId=${hub}
+    Wait For Line On Uart     oximeter rejected the alarm limits (ATT error 0x13)    testerId=${hub}
+    Write Line To Uart        log    testerId=${hub}
+    Wait For Line On Uart     \#2 boot 1 \\+[0-9.]+ s: no device key provisioned    testerId=${hub}    treatAsRegex=true
+    Assert LED State          false

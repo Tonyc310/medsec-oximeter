@@ -40,7 +40,7 @@ The oximeter alarms when SpO2 falls below its limit or the pulse rate leaves its
 
 The limits are a characteristic in a second, vendor-specific service. The hub sets them from its shell, the way a clinician would at a central station: `limits 95 50 120`. The oximeter refuses settings a monitor wouldn't offer, such as an SpO2 limit of 100% or a low pulse limit above the high one, and keeps the last accepted ones.
 
-Range checks keep out nonsense, not malice: a 50% SpO2 limit is a legitimate setting, and it also silences a hypoxia alarm. So a change has to be signed. The oximeter offers a random 16-byte challenge, replaced after every attempt and on every connection. A change is the limits followed by a tag over the challenge and the limits: HMAC-SHA256 cut to 128 bits ([core/src/limits_auth.c](core/src/limits_auth.c)). Only a holder of the key can make the tag, and each tag works once. The hub signs the way the monitoring backend will. Until devices get keys of their own, a later Phase 4 control, both builds share a key that the first build generates into `build/limits.key`, which is never committed.
+Range checks keep out nonsense, not malice: a 50% SpO2 limit is a legitimate setting, and it also silences a hypoxia alarm. So a change has to be signed. The oximeter offers a random 16-byte challenge, replaced after every attempt and on every connection. A change is the limits followed by a tag over the challenge and the limits: HMAC-SHA256 cut to 128 bits ([core/src/limits_auth.c](core/src/limits_auth.c)). Only a holder of the key can make the tag, and each tag works once. The hub signs the way the monitoring backend will. Each oximeter has a key of its own, put into its UICR (a small area of non-volatile memory apart from the firmware) at the factory by [tools/provision.py](tools/provision.py). The backend derives the same key from a master secret and the oximeter's device ID with HKDF-SHA256, so it keeps no per-device keys, and a key taken from one oximeter opens no other. The firmware holds no key, so every device runs the same image, and an oximeter that was never provisioned refuses every change. Here the hub stands in for the backend and holds the master, which its first build generates into `build/limits-master.key` and which is never committed; in the real system it never leaves the backend.
 
 The oximeter watches itself too. If the sensor stops sending samples, from a fault or a loose connection, it raises the technical alarm within 1.5 s and sends "no reading" once a second, rather than falling silent. If the firmware itself stops, the nRF52840's watchdog resets it within 2 s ([app/src/supervisor.c](app/src/supervisor.c)).
 
@@ -62,6 +62,8 @@ An nRF52840 DK and a MAX30101 (or MAX30102) breakout, wired to the DK's Arduino 
 
 The DK's GPIO run at 3.0 V: check that the breakout pulls SDA, SCL and INT up to no more than that.
 
+Each DK needs its limits key provisioned once, before the debug port is locked: `python3 tools/provision.py --master build/limits-master.key --device-id <ID>` lists the UICR addresses and words to write with a debug probe. The ID is the one the hub logs as "signing for oximeter ...".
+
 ## Build and run
 
 Needs `git`, `cmake`, `ninja`, Python 3 with `venv`, `dtc` and `gperf`. From the repository root, once:
@@ -81,6 +83,8 @@ Then, in each new shell:
 . .venv/bin/activate
 west build -b nrf52840dk/nrf52840 -d build/oximeter app
 west build -b nrf52840dk/nrf52840 -d build/hub hub
+python3 tools/provision.py --master build/limits-master.key --device-id 0123456789abcdef \
+    --renode build/provision.resc            # the factory's step, once: the oximeter's key into UICR
 renode renode/oximeter.resc                # type `start`; each board's console opens in a window
 ```
 
@@ -109,10 +113,10 @@ west build -b native_sim/native/64 -d build/event_log app/tests/event_log
 build/event_log/zephyr/zephyr.exe -flash_in_ram
 ```
 
-The Robot Framework tests boot both boards in [Renode](https://renode.io) 1.17, joined by a simulated Bluetooth link, with the sensor model set to a patient (90 bpm, 94%). The first checks the hub receives that reading and the alarm LED stays off, then sets a 95% limit from the hub's shell and checks the oximeter accepts the signed change, alarms, and lights the LED. The second runs the same hub built with a key of its own, as a gateway that wasn't given this oximeter's key, and checks the oximeter refuses its change and keeps monitoring under the old limits. The third sets the limits, resets the oximeter, and checks it starts with them and alarms again. The fourth stops the sensor and checks the technical alarm comes on within 2 s and the hub hears "no reading"; the fifth stops the processor and checks the watchdog brings the oximeter back, measuring under the clinician's limits. The last two read the security event log from the hub: one finds the start-up, the hub's connection and its accepted change; the other, run with the stranger's hub, finds its change refused because the tag doesn't match. They need `renode-test` on `PATH` with its Python packages (`pip install -r <renode>/tests/requirements.txt`), and write their report to the working directory, so run them from the build tree:
+The Robot Framework tests boot both boards in [Renode](https://renode.io) 1.17, joined by a simulated Bluetooth link, with the sensor model set to a patient (90 bpm, 94%). The first checks the hub receives that reading and the alarm LED stays off, then sets a 95% limit from the hub's shell and checks the oximeter accepts the signed change, alarms, and lights the LED. The second runs the same hub built with a master of its own, as a gateway that can't make this oximeter's key, and checks the oximeter refuses its change and keeps monitoring under the old limits. The third sets the limits, resets the oximeter, and checks it starts with them and alarms again. The fourth stops the sensor and checks the technical alarm comes on within 2 s and the hub hears "no reading"; the fifth stops the processor and checks the watchdog brings the oximeter back, measuring under the clinician's limits. The last two read the security event log from the hub: one finds the start-up, the hub's connection and its accepted change; the other, run with the stranger's hub, finds its change refused because the tag doesn't match. The eighth runs an oximeter the factory never provisioned and checks it refuses every change and logs that it has no key. Each test provisions the oximeter first, with the same tool the factory would use. They need `renode-test` on `PATH` with its Python packages (`pip install -r <renode>/tests/requirements.txt`), and write their report to the working directory, so run them from the build tree:
 
 ```bash
-west build -b nrf52840dk/nrf52840 -d build/hub-other-key hub -- -DLIMITS_KEY_FILE=$PWD/build/other-limits.key
+west build -b nrf52840dk/nrf52840 -d build/hub-other-key hub -- -DLIMITS_MASTER_FILE=$PWD/build/other-master.key
 mkdir -p build/renode && cd build/renode && renode-test ../../renode/oximeter.robot
 ```
 
@@ -131,6 +135,7 @@ hub/            the stand-in gateway's Zephyr application, and tests for its sig
 common/         what the two applications share: Bluetooth and crypto definitions, crypto settings
 core/           the oximetry analysis, the PLX encoding, the alarm checks and signed limit changes: portable C17, no Zephyr
 tests/          Unity tests for core/, run on the host
+tools/          provision.py: the factory's step, an oximeter's limits key into UICR
 renode/         Renode platform, scripts, the MAX30101 and flash controller models, and the Robot tests
 docs/security/  the cybersecurity documentation for a premarket submission
 deps/           Zephyr and its modules, fetched by west (git-ignored)

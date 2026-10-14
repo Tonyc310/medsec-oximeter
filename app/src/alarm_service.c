@@ -1,14 +1,15 @@
 #include "alarm_service.h"
 
 #include "alarm.h"
+#include "device_identity.h"
 #include "event_log.h"
 #include "limits_auth.h"
 #include "limits_crypto.h"
-#include "limits_key.h"
 #include "limits_store.h"
 #include "medsec_bt.h"
 
 #include <errno.h>
+#include <mbedtls/platform_util.h>
 #include <string.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
@@ -23,6 +24,7 @@ static const struct bt_uuid_128 limits_uuid = BT_UUID_INIT_128(MEDSEC_ALARM_LIMI
 static const struct bt_uuid_128 state_uuid = BT_UUID_INIT_128(MEDSEC_ALARM_STATE_VAL);
 static const struct bt_uuid_128 challenge_uuid = BT_UUID_INIT_128(MEDSEC_ALARM_CHALLENGE_VAL);
 static const struct bt_uuid_128 log_uuid = BT_UUID_INIT_128(MEDSEC_SECURITY_LOG_VAL);
+static const struct bt_uuid_128 device_id_uuid = BT_UUID_INIT_128(MEDSEC_DEVICE_ID_VAL);
 
 /* LED1 on the DK. */
 static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
@@ -118,6 +120,17 @@ static ssize_t read_log(struct bt_conn *conn, const struct bt_gatt_attr *attr, v
     return bt_gatt_attr_read(conn, attr, buf, len, offset, records, (uint16_t)length);
 }
 
+static ssize_t read_device_id(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf,
+                              uint16_t len, uint16_t offset)
+{
+    uint8_t id[DEVICE_ID_SIZE];
+
+    if (device_identity_id(id) != 0) {
+        return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
+    }
+    return bt_gatt_attr_read(conn, attr, buf, len, offset, id, sizeof id);
+}
+
 /* Anyone in range can read the limits, but only a holder of the limits key can change them, and
  * only once per challenge (threats T-01 to T-03). */
 BT_GATT_SERVICE_DEFINE(
@@ -130,7 +143,9 @@ BT_GATT_SERVICE_DEFINE(
     BT_GATT_CHARACTERISTIC(&challenge_uuid.uuid, BT_GATT_CHRC_READ, BT_GATT_PERM_READ,
                            read_challenge, NULL, NULL),
     BT_GATT_CHARACTERISTIC(&log_uuid.uuid, BT_GATT_CHRC_READ, BT_GATT_PERM_READ, read_log, NULL,
-                           NULL));
+                           NULL),
+    BT_GATT_CHARACTERISTIC(&device_id_uuid.uuid, BT_GATT_CHRC_READ, BT_GATT_PERM_READ,
+                           read_device_id, NULL, NULL));
 
 static void on_connected(struct bt_conn *conn, uint8_t err)
 {
@@ -190,7 +205,18 @@ int alarm_service_init(void)
     }
     LOG_INF("alarm limits: SpO2 below %u%%, pulse below %u or above %u bpm",
             limits.spo2_low_percent, limits.pulse_low_bpm, limits.pulse_high_bpm);
-    if (!limits_crypto_init(limits_key, sizeof limits_key)) {
+    uint8_t key[DEVICE_KEY_SIZE];
+    const bool provisioned = device_identity_key(key);
+
+    /* Without a key, crypto still starts, for the challenges, but loads none: every change is
+     * then refused, as no tag can match. */
+    const bool loaded = limits_crypto_init(key, provisioned ? sizeof key : 0u);
+
+    mbedtls_platform_zeroize(key, sizeof key);
+    if (!provisioned) {
+        LOG_ERR("no device key provisioned: the alarm limits can't be changed");
+        (void)event_log_record(SECURITY_EVENT_NO_DEVICE_KEY, NULL, 0u);
+    } else if (!loaded) {
         return -EIO;
     }
     limits_auth_init(&auth, &limits_crypto);

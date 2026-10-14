@@ -1,12 +1,14 @@
 #include "alarm.h"
+#include "device_keys.h"
 #include "limits_auth.h"
-#include "limits_key.h"
+#include "limits_master.h"
 #include "limits_signer.h"
 #include "medsec_bt.h"
 #include "plx.h"
 #include "security_log.h"
 
 #include <errno.h>
+#include <mbedtls/platform_util.h>
 #include <stdio.h>
 #include <string.h>
 #include <zephyr/bluetooth/bluetooth.h>
@@ -30,6 +32,7 @@ static const struct bt_uuid_128 alarm_limits = BT_UUID_INIT_128(MEDSEC_ALARM_LIM
 static const struct bt_uuid_128 alarm_state = BT_UUID_INIT_128(MEDSEC_ALARM_STATE_VAL);
 static const struct bt_uuid_128 alarm_challenge = BT_UUID_INIT_128(MEDSEC_ALARM_CHALLENGE_VAL);
 static const struct bt_uuid_128 security_log = BT_UUID_INIT_128(MEDSEC_SECURITY_LOG_VAL);
+static const struct bt_uuid_128 device_id = BT_UUID_INIT_128(MEDSEC_DEVICE_ID_VAL);
 
 static struct bt_conn *oximeter;
 static struct bt_gatt_discover_params discover_params;
@@ -38,6 +41,8 @@ static uint16_t limits_handle;
 static uint16_t state_handle;
 static uint16_t challenge_handle;
 static uint16_t log_handle;
+static uint16_t device_id_handle;
+static struct bt_gatt_read_params device_id_read;
 
 /* Each subscription finds its own CCC descriptor, so each needs its own discovery parameters. */
 static struct bt_gatt_subscribe_params measurement_subscription;
@@ -126,14 +131,59 @@ static void subscribe(struct bt_conn *conn, struct bt_gatt_subscribe_params *sub
     }
 }
 
-/* One pass over every characteristic, noting the five the hub uses; then subscribe. */
+/* Standing in for the backend, the hub derives the key the factory gave this oximeter. Only that
+ * device's key is loaded; the master stays with the hub. */
+static uint8_t on_device_id(struct bt_conn *conn, uint8_t err, struct bt_gatt_read_params *params,
+                            const void *data, uint16_t length)
+{
+    uint8_t key[DEVICE_KEY_SIZE];
+
+    ARG_UNUSED(conn);
+    ARG_UNUSED(params);
+    if ((err != 0u) || (data == NULL) || (length != DEVICE_ID_SIZE)) {
+        if (err != 0u) {
+            LOG_WRN("couldn't read the oximeter's ID (ATT error 0x%02x)", err);
+        }
+        return BT_GATT_ITER_STOP;
+    }
+
+    const uint8_t *id = data;
+    const bool ready = device_keys_derive(limits_master, sizeof limits_master, id, key) &&
+                       limits_signer_init(key, sizeof key);
+
+    mbedtls_platform_zeroize(key, sizeof key);
+    if (ready) {
+        LOG_INF("signing for oximeter %02x%02x%02x%02x%02x%02x%02x%02x", id[0], id[1], id[2], id[3],
+                id[4], id[5], id[6], id[7]);
+    } else {
+        LOG_ERR("couldn't derive the oximeter's key");
+    }
+    return BT_GATT_ITER_STOP;
+}
+
+static void read_device_id(struct bt_conn *conn)
+{
+    device_id_read.func = on_device_id;
+    device_id_read.handle_count = 1u;
+    device_id_read.single.handle = device_id_handle;
+    device_id_read.single.offset = 0u;
+
+    const int err = bt_gatt_read(conn, &device_id_read);
+
+    if (err != 0) {
+        LOG_ERR("reading the oximeter's ID failed: %d", err);
+    }
+}
+
+/* One pass over every characteristic, noting the six the hub uses; then subscribe, and learn the
+ * oximeter's ID to sign for it. */
 static uint8_t on_characteristic(struct bt_conn *conn, const struct bt_gatt_attr *attr,
                                  struct bt_gatt_discover_params *params)
 {
     ARG_UNUSED(params);
     if (attr == NULL) {
         if ((measurement_handle == 0u) || (limits_handle == 0u) || (state_handle == 0u) ||
-            (challenge_handle == 0u) || (log_handle == 0u)) {
+            (challenge_handle == 0u) || (log_handle == 0u) || (device_id_handle == 0u)) {
             LOG_WRN("not a pulse oximeter this hub knows");
             return BT_GATT_ITER_STOP;
         }
@@ -141,6 +191,7 @@ static uint8_t on_characteristic(struct bt_conn *conn, const struct bt_gatt_attr
                   on_measurement);
         subscribe(conn, &alarm_subscription, &alarm_ccc_discovery, state_handle, on_alarm);
         LOG_INF("subscribed to readings and alarms");
+        read_device_id(conn);
         return BT_GATT_ITER_STOP;
     }
 
@@ -156,6 +207,8 @@ static uint8_t on_characteristic(struct bt_conn *conn, const struct bt_gatt_attr
         challenge_handle = characteristic->value_handle;
     } else if (bt_uuid_cmp(characteristic->uuid, &security_log.uuid) == 0) {
         log_handle = characteristic->value_handle;
+    } else if (bt_uuid_cmp(characteristic->uuid, &device_id.uuid) == 0) {
+        device_id_handle = characteristic->value_handle;
     }
     return BT_GATT_ITER_CONTINUE;
 }
@@ -316,8 +369,14 @@ static void describe(const security_record_t *record, char *text, size_t size)
     case SECURITY_EVENT_SENSOR_STOPPED:
         (void)snprintf(text, size, "sensor stopped sending samples");
         break;
-    default:
+    case SECURITY_EVENT_SENSOR_RESUMED:
         (void)snprintf(text, size, "sensor sending samples again");
+        break;
+    case SECURITY_EVENT_NO_DEVICE_KEY:
+        (void)snprintf(text, size, "no device key provisioned");
+        break;
+    default:
+        (void)snprintf(text, size, "unknown event %u", record->event);
         break;
     }
 }
@@ -484,10 +543,6 @@ BT_CONN_CB_DEFINE(connection_callbacks) = {
 int main(void)
 {
     LOG_INF("hub started");
-    if (!limits_signer_init(limits_key, sizeof limits_key)) {
-        LOG_ERR("could not load the alarm-limits key");
-        return 0;
-    }
     if (bt_enable(NULL) != 0) {
         LOG_ERR("could not start Bluetooth");
         return 0;

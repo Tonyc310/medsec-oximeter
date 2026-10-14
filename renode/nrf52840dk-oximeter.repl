@@ -8,13 +8,22 @@ max30101: Sensors.MAX30101 @ twi0 0x57
 nvmc: Miscellaneous.NRF52840_NVMC @ sysbus 0x4001E000
     flash: flash
 
-// The flash geometry Zephyr's driver reads from FICR, which Renode leaves at zero: 256 pages of
-// 4 KB. A new chip's flash is erased, all ones.
+// FICR, which Renode leaves at zero: the flash geometry Zephyr's driver reads, 256 pages of 4 KB,
+// and a device ID (0123456789abcdef, as hwinfo gives it). A new chip's flash is erased, all ones.
 sysbus:
     init add:
         Tag <0x10000010, 0x10000013> "CODEPAGESIZE" 0x1000
         Tag <0x10000014, 0x10000017> "CODESIZE" 0x100
+        Tag <0x10000060, 0x10000063> "DEVICEID[0]" 0x89ABCDEF
+        Tag <0x10000064, 0x10000067> "DEVICEID[1]" 0x01234567
 
 flash:
+    init:
+        ResetByte 0xFF
+
+// UICR, where the factory provisions each oximeter's limits key (tools/provision.py). Renode
+// doesn't model it either; it's erased until then.
+uicr: Memory.MappedMemory @ sysbus 0x10001000
+    size: 0x1000
     init:
         ResetByte 0xFF

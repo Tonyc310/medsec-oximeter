@@ -7,3 +7,6 @@
 
 # Python environment that holds west.
 /.venv/
+
+# Python's bytecode cache, from running tools/.
+__pycache__/

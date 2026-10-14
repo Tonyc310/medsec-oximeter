@@ -1,3 +1,0 @@
-#include "limits_key.h"
-
-const uint8_t limits_key[LIMITS_KEY_SIZE] = {@LIMITS_KEY_BYTES@};

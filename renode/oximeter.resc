@@ -10,24 +10,31 @@ include $ORIGIN/Nvmc.cs
 
 emulation CreateBLEMedium "wireless"
 
+# A macro belongs to the machine selected when it's defined, and runs when that machine resets:
+# each machine reloads only its own firmware, so one can reset while the other runs on.
 mach create "oximeter"
 machine LoadPlatformDescription $ORIGIN/nrf52840dk-oximeter.repl
 connector Connect sysbus.radio wireless
 showAnalyzer sysbus.uart0
+macro reset
+"""
+    sysbus LoadELF $oximeter_bin
+"""
+runMacro $reset
+
+# The factory's step: the oximeter's limits key into UICR. Make it with tools/provision.py.
+$provisioning?=$ORIGIN/../build/provision.resc
+include $provisioning
 
 mach create "hub"
 machine LoadPlatformDescription @platforms/boards/nrf52840dk_nrf52840.repl
 connector Connect sysbus.radio wireless
 showAnalyzer sysbus.uart0
-
-# The two Bluetooth stacks need the machines kept within 10 us of each other.
-emulation SetGlobalQuantum "0.00001"
-
 macro reset
 """
-    mach set "oximeter"
-    sysbus LoadELF $oximeter_bin
-    mach set "hub"
     sysbus LoadELF $hub_bin
 """
 runMacro $reset
+
+# The two Bluetooth stacks need the machines kept within 10 us of each other.
+emulation SetGlobalQuantum "0.00001"

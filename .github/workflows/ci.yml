@@ -69,14 +69,14 @@ jobs:
           west build -b native_sim/native/64 -d build/event_log app/tests/event_log
           build/event_log/zephyr/zephyr.exe -flash_in_ram
 
-      # The second hub has a key of its own, for the test that a stranger's change is refused.
+      # The second hub has a master of its own, for the test that a stranger's change is refused.
       # Zephyr's flash driver tests, on the internal flash, check the flash controller model.
       - name: Build the firmware
         run: |
           west build -b nrf52840dk/nrf52840 -d build/oximeter app
           west build -b nrf52840dk/nrf52840 -d build/hub hub
           west build -b nrf52840dk/nrf52840 -d build/hub-other-key hub -- \
-            -DLIMITS_KEY_FILE=$PWD/build/other-limits.key
+            -DLIMITS_MASTER_FILE=$PWD/build/other-master.key
           west build -b nrf52840dk/nrf52840 -d build/flash-test deps/zephyr/tests/drivers/flash/common \
             -- -DCONFIG_TEST_FORCE_STORAGE_PARTITION=y
 
