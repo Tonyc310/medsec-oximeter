@@ -24,6 +24,27 @@ BUILD_ASSERT(SAMPLE_RATE_HZ == OXIMETRY_SAMPLE_RATE_HZ,
 static const struct device *const sensor = DEVICE_DT_GET(SENSOR_NODE);
 static oximetry_t oximetry;
 
+/* Called with each reading: the self-test an update must pass. The sensor answered with its part
+ * ID, Bluetooth is up, since main() starts the sensor after it, and the analysis has run. Until the
+ * image is marked as working, a reset brings back the one before it. A failed write is tried again
+ * with the next reading. */
+static void confirm_image(void)
+{
+    static bool confirmed;
+
+    if (confirmed) {
+        return;
+    }
+    if (!boot_is_img_confirmed()) {
+        if (boot_write_img_confirmed() != 0) {
+            LOG_ERR("could not mark the image as working");
+            return;
+        }
+        LOG_INF("image marked as working");
+    }
+    confirmed = true;
+}
+
 /* Runs on the sensor driver's thread, once per sample, when the sensor's INT line falls. */
 static void on_sample(const struct device *dev, const struct sensor_trigger *trigger)
 {
@@ -48,6 +69,7 @@ static void on_sample(const struct device *dev, const struct sensor_trigger *tri
     if (!oximetry_add_sample(&oximetry, sample, &reading)) {
         return;
     }
+    confirm_image();
     if (reading.valid) {
         LOG_INF("SpO2 %u%%, pulse %u bpm", reading.spo2_percent, reading.pulse_bpm);
     } else {

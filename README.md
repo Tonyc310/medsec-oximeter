@@ -12,7 +12,7 @@ Phase 2 of 7, the baseline device, is complete. Once a second the firmware works
 
 Phase 3, the architecture views and threat model, is under way in [docs/security/](docs/security/): so far the [system description](docs/security/system.md), the [threat model](docs/security/threat-model.md) and the [updatability view](docs/security/updatability.md).
 
-Phase 4, the security controls, has started with the threat model's central case: a change of alarm limits must now be signed (see [Alarms](#alarms)). MCUboot also checks the firmware's signature at every boot (see [Secure boot](#secure-boot)).
+Phase 4, the security controls, has started with the threat model's central case: a change of alarm limits must now be signed (see [Alarms](#alarms)). MCUboot also checks the firmware's signature at every boot and keeps an update only once it works (see [Secure boot and updates](#secure-boot-and-updates)).
 
 Renode has no model of the MAX30101, so [renode/Max30101.cs](renode/Max30101.cs) adds one: the registers Zephyr's driver uses, the 32-sample FIFO filled at the configured rate, the interrupt line, and a synthetic pulse waveform whose light level, pulse depth and heart rate a test can set. Nor does it model the nRF52840's flash controller, which keeping anything in flash needs: [renode/Nvmc.cs](renode/Nvmc.cs) erases flash pages, and Zephyr's own flash driver tests check it.
 
@@ -48,11 +48,13 @@ It also keeps a security event log in flash: each start-up with the reset cause,
 
 Accepted limits are kept in flash (Zephyr's settings, on NVS), so a reset doesn't quietly bring back the defaults. A change the oximeter can't save is refused rather than applied until the next reset, so the clinician knows it didn't take. One simplification a real monitor wouldn't make: there's no alarm delay to avoid nuisance alarms (IEC 60601-1-8).
 
-## Secure boot
+## Secure boot and updates
 
 MCUboot starts before the oximeter and runs it only if the image carries a valid signature from the release key: ECDSA P-256 over the image and its header, checked at every boot, not only after an update. The build makes the release key on its first run, in `build/release-key.pem`, which is never committed ([app/sysbuild.cmake](app/sysbuild.cmake)). Left to itself, sysbuild would sign with the development key that comes with MCUboot, whose private half anyone can download. A real product keeps its release key in an offline signing service. At start-up the oximeter logs the version MCUboot checked.
 
 MCUboot checks signatures with its own copy of TinyCrypt, not the PSA Crypto the application uses. In MCUboot, PSA Crypto needs a random source, and the nRF52840's random number generator driver needs threads, which MCUboot leaves out, so it would fall back to Zephyr's test-only generator. Checking a signature needs neither randomness nor a secret, and with TinyCrypt the whole of MCUboot fits in 30 KB of its 48.
+
+An update first runs as a test. MCUboot swaps it in but keeps the image before it, and the update marks itself as working only once it passes its self-test: the sensor answered, Bluetooth is up and the analysis gave a reading. Until then, the next reset, by the watchdog if the update hangs, swaps the previous image back. Updates can't yet arrive over Bluetooth: that waits for pairing.
 
 Until the debug port is locked, which only real hardware can show, anyone with a debug probe can still replace MCUboot itself.
 
@@ -129,7 +131,7 @@ west build -b nrf52840dk/nrf52840 -d build/hub-other-key hub -- -DLIMITS_MASTER_
 mkdir -p build/renode && cd build/renode && renode-test ../../renode/oximeter.robot
 ```
 
-Three more boot the oximeter through MCUboot ([renode/boot.robot](renode/boot.robot)), signing their own images with MCUboot's imgtool. The first checks MCUboot starts the signed oximeter, which reports the version from its signed header; the second, that an image signed with MCUboot's published development key never runs; the third, that neither does one with a byte changed after signing:
+Four more boot the oximeter through MCUboot ([renode/boot.robot](renode/boot.robot)), signing their own images with MCUboot's imgtool. The first checks MCUboot starts the signed oximeter, which reports the version from its signed header; the second, that an image signed with MCUboot's published development key never runs; the third, that neither does one with a byte changed after signing. The fourth puts an update in the second slot, marked for a test boot, and checks it marks itself as working once it has a reading and still runs after a reset:
 
 ```bash
 cd build/renode && renode-test ../../renode/boot.robot
