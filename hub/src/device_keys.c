@@ -3,8 +3,13 @@
 #include <psa/crypto.h>
 #include <string.h>
 
-/* Says what the derived key is for, so the same master can never yield it for another purpose. */
-#define LABEL "medsec limits key"
+/* Each says what its key is for, so the same master can never yield one key for two jobs. They
+ * must match tools/provision.py. */
+static const char *const labels[] = {
+    [DEVICE_KEY_LIMITS] = "medsec limits key",
+    [DEVICE_KEY_LOG] = "medsec log key",
+};
+#define LONGEST_LABEL (sizeof "medsec limits key" - 1u)
 
 bool device_keys_hkdf(const uint8_t *ikm, size_t ikm_length, const uint8_t *salt,
                       size_t salt_length, const uint8_t *info, size_t info_length, uint8_t *out,
@@ -36,13 +41,19 @@ bool device_keys_hkdf(const uint8_t *ikm, size_t ikm_length, const uint8_t *salt
     return status == PSA_SUCCESS;
 }
 
-bool device_keys_derive(const uint8_t *master, size_t master_length,
+bool device_keys_derive(const uint8_t *master, size_t master_length, device_key_purpose_t purpose,
                         const uint8_t device_id[DEVICE_ID_SIZE], uint8_t key[DEVICE_KEY_SIZE])
 {
-    uint8_t info[sizeof LABEL - 1u + DEVICE_ID_SIZE];
+    uint8_t info[LONGEST_LABEL + DEVICE_ID_SIZE];
 
-    (void)memcpy(info, LABEL, sizeof LABEL - 1u);
-    (void)memcpy(&info[sizeof LABEL - 1u], device_id, DEVICE_ID_SIZE);
-    return device_keys_hkdf(master, master_length, NULL, 0u, info, sizeof info, key,
-                            DEVICE_KEY_SIZE);
+    if ((size_t)purpose >= (sizeof labels / sizeof labels[0])) {
+        return false;
+    }
+
+    const size_t label_length = strlen(labels[purpose]);
+
+    (void)memcpy(info, labels[purpose], label_length);
+    (void)memcpy(&info[label_length], device_id, DEVICE_ID_SIZE);
+    return device_keys_hkdf(master, master_length, NULL, 0u, info, label_length + DEVICE_ID_SIZE,
+                            key, DEVICE_KEY_SIZE);
 }

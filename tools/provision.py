@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Provision an oximeter's limits key, as the factory would.
+"""Provision an oximeter's keys, as the factory would.
 
-Derives the device's key from the master secret and the device ID the way the backend does,
-with HKDF-SHA256 (RFC 5869), and gives the UICR words to write: as a list, or as a Renode
-script that writes them into the simulated oximeter.
+Derives the device's limits key and log key from the master secret and the device ID the way the
+backend does, with HKDF-SHA256 (RFC 5869), and gives the UICR words to write: as a list, or as a
+Renode script that writes them into the simulated oximeter.
 """
 
 import argparse
@@ -12,8 +12,9 @@ import hmac
 import sys
 from pathlib import Path
 
-# Must match hub/src/device_keys.c and app/src/device_identity.c.
-LABEL = b"medsec limits key"
+# Must match hub/src/device_keys.c and app/src/device_identity.c: one label per key, and the keys
+# in this order in UICR.
+LABELS = (b"medsec limits key", b"medsec log key")
 KEY_SIZE = 32
 DEVICE_ID_SIZE = 8
 UICR_CUSTOMER = 0x10001080
@@ -32,16 +33,16 @@ def hkdf_sha256(ikm: bytes, salt: bytes, info: bytes, length: int) -> bytes:
     return okm[:length]
 
 
-def device_key(master: bytes, device_id: bytes) -> bytes:
-    """The limits key of the oximeter with `device_id`."""
-    return hkdf_sha256(master, b"", LABEL + device_id, KEY_SIZE)
+def device_keys(master: bytes, device_id: bytes) -> bytes:
+    """The keys of the oximeter with `device_id`, one after the other, as UICR holds them."""
+    return b"".join(hkdf_sha256(master, b"", label + device_id, KEY_SIZE) for label in LABELS)
 
 
-def uicr_words(key: bytes) -> list[tuple[int, int]]:
-    """The (address, value) pairs that put `key` in UICR, little-endian words."""
+def uicr_words(keys: bytes) -> list[tuple[int, int]]:
+    """The (address, value) pairs that put `keys` in UICR, little-endian words."""
     return [
-        (UICR_CUSTOMER + offset, int.from_bytes(key[offset : offset + 4], "little"))
-        for offset in range(0, KEY_SIZE, 4)
+        (UICR_CUSTOMER + offset, int.from_bytes(keys[offset : offset + 4], "little"))
+        for offset in range(0, len(keys), 4)
     ]
 
 
@@ -64,7 +65,7 @@ def main() -> None:
 
     master = read_hex(args.master.read_text(), KEY_SIZE, str(args.master))
     device_id = read_hex(args.device_id, DEVICE_ID_SIZE, "the device ID")
-    words = uicr_words(device_key(master, device_id))
+    words = uicr_words(device_keys(master, device_id))
 
     if args.renode is None:
         for address, value in words:

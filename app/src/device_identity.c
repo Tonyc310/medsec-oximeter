@@ -5,15 +5,17 @@
 #include <zephyr/drivers/hwinfo.h>
 #include <zephyr/sys/byteorder.h>
 
-/* The key is the first eight of UICR's customer registers, little-endian: out of every flash
- * partition, so updates and settings never touch it, and unreadable by a debugger once the
- * debug port is locked. tools/provision.py writes it. */
+/* The keys are in UICR's customer registers, eight words each in purpose order, little-endian: out
+ * of every flash partition, so updates and settings never touch them, and unreadable by a
+ * debugger once the debug port is locked. tools/provision.py writes them. */
 #define KEY_WORDS (DEVICE_KEY_SIZE / sizeof(uint32_t))
 
-bool device_identity_key(uint8_t key[DEVICE_KEY_SIZE])
+bool device_identity_key(device_key_purpose_t purpose, uint8_t key[DEVICE_KEY_SIZE])
 {
+    const size_t first = (size_t)purpose * KEY_WORDS;
+
     for (size_t i = 0u; i < KEY_WORDS; i++) {
-        sys_put_le32(NRF_UICR->CUSTOMER[i], &key[i * sizeof(uint32_t)]);
+        sys_put_le32(NRF_UICR->CUSTOMER[first + i], &key[i * sizeof(uint32_t)]);
     }
     return device_key_provisioned(key);
 }

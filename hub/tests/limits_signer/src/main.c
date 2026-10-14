@@ -2,6 +2,8 @@
 #include "limits_auth.h"
 #include "limits_crypto.h"
 #include "limits_signer.h"
+#include "log_mac.h"
+#include "log_verifier.h"
 
 #include <zephyr/ztest.h>
 
@@ -87,11 +89,27 @@ ZTEST(limits_signer, test_gives_each_device_its_own_key)
     uint8_t second_key[DEVICE_KEY_SIZE];
     uint8_t first_again[DEVICE_KEY_SIZE];
 
-    zassert_true(device_keys_derive(shared_key, sizeof shared_key, first, first_key));
-    zassert_true(device_keys_derive(shared_key, sizeof shared_key, second, second_key));
-    zassert_true(device_keys_derive(shared_key, sizeof shared_key, first, first_again));
+    zassert_true(
+        device_keys_derive(shared_key, sizeof shared_key, DEVICE_KEY_LIMITS, first, first_key));
+    zassert_true(
+        device_keys_derive(shared_key, sizeof shared_key, DEVICE_KEY_LIMITS, second, second_key));
+    zassert_true(
+        device_keys_derive(shared_key, sizeof shared_key, DEVICE_KEY_LIMITS, first, first_again));
     zassert_true(memcmp(first_key, second_key, sizeof first_key) != 0);
     zassert_mem_equal(first_key, first_again, sizeof first_key);
+}
+
+/* One key per job: the log key and the limits key of the same device differ. */
+ZTEST(limits_signer, test_derives_a_different_key_for_the_log)
+{
+    static const uint8_t id[DEVICE_ID_SIZE] = {0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef};
+    uint8_t limits_key[DEVICE_KEY_SIZE];
+    uint8_t log_key[DEVICE_KEY_SIZE];
+
+    zassert_true(
+        device_keys_derive(shared_key, sizeof shared_key, DEVICE_KEY_LIMITS, id, limits_key));
+    zassert_true(device_keys_derive(shared_key, sizeof shared_key, DEVICE_KEY_LOG, id, log_key));
+    zassert_true(memcmp(limits_key, log_key, sizeof log_key) != 0);
 }
 
 /* As in the field: the factory gave the oximeter the key derived for its ID, and the backend
@@ -106,7 +124,8 @@ ZTEST(limits_signer, test_signs_with_the_key_derived_for_that_device)
     uint8_t command[LIMITS_AUTH_COMMAND_SIZE];
     alarm_limits_t limits = alarm_default_limits();
 
-    zassert_true(device_keys_derive(shared_key, sizeof shared_key, oximeter_id, key));
+    zassert_true(
+        device_keys_derive(shared_key, sizeof shared_key, DEVICE_KEY_LIMITS, oximeter_id, key));
     zassert_true(limits_crypto_init(key, sizeof key));
     limits_auth_init(&oximeter, &limits_crypto);
 
@@ -115,11 +134,70 @@ ZTEST(limits_signer, test_signs_with_the_key_derived_for_that_device)
     zassert_equal(limits_auth_apply(&oximeter, command, sizeof command, &limits),
                   LIMITS_AUTH_ACCEPTED);
 
-    zassert_true(device_keys_derive(shared_key, sizeof shared_key, other_id, key));
+    zassert_true(
+        device_keys_derive(shared_key, sizeof shared_key, DEVICE_KEY_LIMITS, other_id, key));
     zassert_true(limits_signer_init(key, sizeof key));
     zassert_true(limits_signer_sign(limits_auth_challenge(&oximeter), &raised, command));
     zassert_equal(limits_auth_apply(&oximeter, command, sizeof command, &limits),
                   LIMITS_AUTH_BAD_TAG);
+}
+
+static const uint8_t oximeter_id[DEVICE_ID_SIZE] = {0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef};
+static const uint8_t other_id[DEVICE_ID_SIZE] = {0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xee};
+
+/* A log entry as the oximeter with `id` makes it: a record, tagged with that device's log key. */
+static void tag_as_oximeter(const uint8_t id[DEVICE_ID_SIZE],
+                            uint8_t entry[SECURITY_LOG_ENTRY_SIZE])
+{
+    static const security_record_t record = {.sequence = 7u,
+                                             .boot = 2u,
+                                             .uptime_ms = 5486u,
+                                             .event = SECURITY_EVENT_LIMITS_ACCEPTED,
+                                             .detail = {95u, 50u, 0u, 120u, 0u}};
+    uint8_t key[DEVICE_KEY_SIZE];
+
+    zassert_true(device_keys_derive(shared_key, sizeof shared_key, DEVICE_KEY_LOG, id, key));
+    zassert_true(log_mac_init(key, sizeof key));
+    security_log_encode(&record, entry);
+    zassert_true(log_mac_tag(entry, SECURITY_LOG_RECORD_SIZE, &entry[SECURITY_LOG_RECORD_SIZE]));
+}
+
+/* The backend checks with the log key it derives for the oximeter it's reading. */
+static void check_as_backend_for(const uint8_t id[DEVICE_ID_SIZE])
+{
+    uint8_t key[DEVICE_KEY_SIZE];
+
+    zassert_true(device_keys_derive(shared_key, sizeof shared_key, DEVICE_KEY_LOG, id, key));
+    zassert_true(log_verifier_init(key, sizeof key));
+}
+
+ZTEST(limits_signer, test_verifies_a_record_tagged_with_the_devices_log_key)
+{
+    uint8_t entry[SECURITY_LOG_ENTRY_SIZE];
+
+    tag_as_oximeter(oximeter_id, entry);
+    check_as_backend_for(oximeter_id);
+    zassert_true(log_verifier_check(entry));
+}
+
+/* Whatever relays the log can't change what it says. */
+ZTEST(limits_signer, test_refuses_a_record_with_one_byte_changed)
+{
+    uint8_t entry[SECURITY_LOG_ENTRY_SIZE];
+
+    tag_as_oximeter(oximeter_id, entry);
+    entry[11] ^= 0x01u; /* the first detail byte: the SpO2 limit */
+    check_as_backend_for(oximeter_id);
+    zassert_false(log_verifier_check(entry));
+}
+
+ZTEST(limits_signer, test_refuses_a_record_tagged_with_another_devices_key)
+{
+    uint8_t entry[SECURITY_LOG_ENTRY_SIZE];
+
+    tag_as_oximeter(other_id, entry);
+    check_as_backend_for(oximeter_id);
+    zassert_false(log_verifier_check(entry));
 }
 
 /* Both sides start each test holding the same key, as the oximeter and its hub do. */

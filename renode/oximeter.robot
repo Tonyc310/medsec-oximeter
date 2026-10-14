@@ -137,3 +137,21 @@ Refuses Every Change Without A Device Key
     Write Line To Uart        log    testerId=${hub}
     Wait For Line On Uart     \#2 boot 1 \\+[0-9.]+ s: no device key provisioned    testerId=${hub}    treatAsRegex=true
     Assert LED State          false
+
+Verifies Every Record Of The Log
+    Start System
+    Monitor A Patient At 94 Percent
+    Write Line To Uart        limits 95 50 120    testerId=${hub}
+    Wait For Line On Uart     oximeter accepted the alarm limits    testerId=${hub}
+
+    # Each record carries a MAC under the oximeter's log key, which the backend can derive.
+    Write Line To Uart        log    testerId=${hub}
+    Wait For Line On Uart     3 security records, 3 verified    testerId=${hub}
+
+Can't Verify The Log Without The Master
+    Start System              ${HUB_OTHER_KEY_ELF}
+    Monitor A Patient At 94 Percent
+
+    # A gateway without the master can read the log but can neither vouch for it nor forge it.
+    Write Line To Uart        log    testerId=${hub}
+    Wait For Line On Uart     [0-9]+ security records, 0 verified    testerId=${hub}    treatAsRegex=true

@@ -206,7 +206,7 @@ int alarm_service_init(void)
     LOG_INF("alarm limits: SpO2 below %u%%, pulse below %u or above %u bpm",
             limits.spo2_low_percent, limits.pulse_low_bpm, limits.pulse_high_bpm);
     uint8_t key[DEVICE_KEY_SIZE];
-    const bool provisioned = device_identity_key(key);
+    const bool provisioned = device_identity_key(DEVICE_KEY_LIMITS, key);
 
     /* Without a key, crypto still starts, for the challenges, but loads none: every change is
      * then refused, as no tag can match. */

@@ -1,9 +1,12 @@
 #include "alarm_service.h"
+#include "device_identity.h"
 #include "event_log.h"
+#include "log_mac.h"
 #include "oximetry.h"
 #include "plx_service.h"
 #include "supervisor.h"
 
+#include <mbedtls/platform_util.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/logging/log.h>
@@ -64,6 +67,18 @@ static void on_stall(void)
     alarm_service_update(&none);
 }
 
+/* Before the log starts, so even the start-up record is tagged. Without a key, records are still
+ * kept, with tags that verify against nothing. */
+static void load_log_key(void)
+{
+    uint8_t key[DEVICE_KEY_SIZE];
+
+    if (device_identity_key(DEVICE_KEY_LOG, key) && !log_mac_init(key, sizeof key)) {
+        LOG_ERR("could not load the log key");
+    }
+    mbedtls_platform_zeroize(key, sizeof key);
+}
+
 int main(void)
 {
     static const struct sensor_trigger data_ready = {
@@ -72,6 +87,7 @@ int main(void)
     };
 
     LOG_INF("medsec-oximeter started");
+    load_log_key();
     /* Monitoring goes on without the log if it can't start. */
     if (event_log_start() != 0) {
         LOG_ERR("security event log unavailable");

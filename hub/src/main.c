@@ -3,6 +3,7 @@
 #include "limits_auth.h"
 #include "limits_master.h"
 #include "limits_signer.h"
+#include "log_verifier.h"
 #include "medsec_bt.h"
 #include "plx.h"
 #include "security_log.h"
@@ -131,8 +132,9 @@ static void subscribe(struct bt_conn *conn, struct bt_gatt_subscribe_params *sub
     }
 }
 
-/* Standing in for the backend, the hub derives the key the factory gave this oximeter. Only that
- * device's key is loaded; the master stays with the hub. */
+/* Standing in for the backend, the hub derives the keys the factory gave this oximeter: one to sign
+ * its limit changes, one to check its log. Only that device's keys are loaded; the master stays
+ * with the hub. */
 static uint8_t on_device_id(struct bt_conn *conn, uint8_t err, struct bt_gatt_read_params *params,
                             const void *data, uint16_t length)
 {
@@ -148,15 +150,20 @@ static uint8_t on_device_id(struct bt_conn *conn, uint8_t err, struct bt_gatt_re
     }
 
     const uint8_t *id = data;
-    const bool ready = device_keys_derive(limits_master, sizeof limits_master, id, key) &&
-                       limits_signer_init(key, sizeof key);
+    bool ready =
+        device_keys_derive(limits_master, sizeof limits_master, DEVICE_KEY_LIMITS, id, key) &&
+        limits_signer_init(key, sizeof key);
+
+    ready = ready &&
+            device_keys_derive(limits_master, sizeof limits_master, DEVICE_KEY_LOG, id, key) &&
+            log_verifier_init(key, sizeof key);
 
     mbedtls_platform_zeroize(key, sizeof key);
     if (ready) {
         LOG_INF("signing for oximeter %02x%02x%02x%02x%02x%02x%02x%02x", id[0], id[1], id[2], id[3],
                 id[4], id[5], id[6], id[7]);
     } else {
-        LOG_ERR("couldn't derive the oximeter's key");
+        LOG_ERR("couldn't derive the oximeter's keys");
     }
     return BT_GATT_ITER_STOP;
 }
@@ -381,23 +388,32 @@ static void describe(const security_record_t *record, char *text, size_t size)
     }
 }
 
+/* Every record is shown, verified or not: one that fails is what the backend most needs to see. */
 static void print_log(void)
 {
+    unsigned int count = 0u;
+    unsigned int verified = 0u;
+
     for (size_t at = 0u; (at + SECURITY_LOG_ENTRY_SIZE) <= log_length;
          at += SECURITY_LOG_ENTRY_SIZE) {
         security_record_t record;
         char text[80];
 
+        count++;
         if (!security_log_decode(&log_entries[at], SECURITY_LOG_RECORD_SIZE, &record)) {
             LOG_WRN("malformed security record ignored");
             continue;
         }
+
+        const bool genuine = log_verifier_check(&log_entries[at]);
+
+        verified += genuine ? 1u : 0u;
         describe(&record, text, sizeof text);
-        LOG_INF("#%u boot %u +%u.%03u s: %s", (unsigned int)record.sequence, record.boot,
+        LOG_INF("#%u boot %u +%u.%03u s: %s (%s)", (unsigned int)record.sequence, record.boot,
                 (unsigned int)(record.uptime_ms / 1000u), (unsigned int)(record.uptime_ms % 1000u),
-                text);
+                text, genuine ? "MAC ok" : "MAC doesn't match");
     }
-    LOG_INF("%u security records", (unsigned int)(log_length / SECURITY_LOG_ENTRY_SIZE));
+    LOG_INF("%u security records, %u verified", count, verified);
 }
 
 static uint8_t on_log(struct bt_conn *conn, uint8_t err, struct bt_gatt_read_params *params,
