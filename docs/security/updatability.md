@@ -66,17 +66,17 @@ The release key never leaves the build environment (DS-5): an attacker with it c
 
 ## Interrupted and failed updates
 
-FDA asks what happens when an update is interrupted, at each phase of the process. MCUboot's swap mode is chosen for this: it keeps the previous image until the new one has proved it works.
+FDA asks what happens when an update is interrupted, at each phase of the process. MCUboot's swap mode is chosen for this: it keeps the previous image until the new one has proved it works. Of its swap methods, swap using offset is the one MCUboot recommends for new products, and it writes less flash than swap using move.
 
 | What happens | Result | Status |
 |---|---|---|
 | The Bluetooth link drops during the upload | slot 1 holds a partial image that is never booted. The running image is untouched, and the gateway starts the upload again on the next connection | planned |
 | The image fails its signature or rollback check | MCUboot leaves it in slot 1, unused, and boots the current image. The app reports the rejection to the gateway and records it in the security log | planned |
-| Power is lost during the swap | MCUboot records the swap's progress in the slots' trailers and finishes it after the next reset | planned |
-| The new image boots but doesn't pass its self-test, or hangs | it never marks itself OK. A watchdog (T-17) resets a hung image. At the next reset MCUboot swaps the previous image back | planned |
-| The new image passes its self-test | it marks itself OK and the swap becomes permanent | planned |
+| Power is lost during the swap | MCUboot records the swap's progress in the slots' trailers and finishes it after the next reset. MCUboot's own simulator tests this, cutting power at each flash write of a swap in turn, and its CI runs it with swap using offset; Renode tests here would add nothing to that | done, MCUboot's tests |
+| The new image boots but doesn't pass its self-test, or hangs | it never marks itself OK. A watchdog (T-17) resets a hung image. At the next reset MCUboot swaps the previous image back | done |
+| The new image passes its self-test | it marks itself OK and the swap becomes permanent | done |
 
-The self-test that confirms an image checks that the sensor answers with its part ID, the analysis runs, and the Bluetooth stack is up. It doesn't wait for the gateway to connect, because a gateway outage shouldn't undo a good update.
+The self-test that confirms an image checks that the sensor answers with its part ID, the analysis runs, and the Bluetooth stack is up. The first reading shows all three, since the sensor starts only after Bluetooth. It doesn't wait for the gateway to connect, because a gateway outage shouldn't undo a good update.
 
 **Monitoring during an update.** The upload runs while the oximeter keeps measuring and alarming. Flash writes stall the processor, so they must never stall it for longer than the sensor's 32-sample FIFO holds, 320 ms at 100 samples a second. The swap and reboot do stop monitoring for a few seconds. So an update is installed only at a time the clinician approves, and the gateway reports "paused for update" to the backend. That way the gap is announced, not silent like T-10 and T-23. Phase 6 measures both the stalls and the gap.
 
