@@ -9,6 +9,8 @@ ${IMGTOOL}                  ${CURDIR}/../deps/bootloader/mcuboot/scripts/imgtool
 # The development key that comes with MCUboot, and sysbuild's default: its private half is public.
 ${PUBLISHED_KEY}            ${CURDIR}/../deps/bootloader/mcuboot/root-ec-p256.pem
 ${TEST_IMAGES}              ${CURDIR}/../build/renode
+# In the oximeter's program: its slot starts at 0xC000, after MCUboot, with a 0x200-byte header.
+${PROGRAM_BYTE}             0xD000
 # Checking signatures needs no device keys.
 ${UNPROVISIONED}            ${CURDIR}/unprovisioned.resc
 ${UART}                     sysbus.uart0
@@ -42,6 +44,17 @@ Boots The Signed Oximeter Through MCUboot
 Refuses An Image Signed With MCUboot's Published Key
     Sign The Oximeter         ${PUBLISHED_KEY}    ${TEST_IMAGES}/published-key.hex
     Load The Oximeter         ${TEST_IMAGES}/published-key.hex
+    Start Emulation
+    Wait For Line On Uart     Unable to find bootable image    testerId=${oximeter}
+    Should Not Be On Uart     medsec-oximeter    testerId=${oximeter}    timeout=3
+
+Refuses An Image Changed After Signing
+    Load The Oximeter
+    # One byte of the program flipped, as by someone rewriting the flash.
+    Execute Command           mach set "oximeter"
+    ${byte}=                  Execute Command    sysbus ReadByte ${PROGRAM_BYTE}
+    ${flipped}=               Evaluate    int($byte.strip(), 16) ^ 0xFF
+    Execute Command           sysbus WriteByte ${PROGRAM_BYTE} ${flipped}
     Start Emulation
     Wait For Line On Uart     Unable to find bootable image    testerId=${oximeter}
     Should Not Be On Uart     medsec-oximeter    testerId=${oximeter}    timeout=3

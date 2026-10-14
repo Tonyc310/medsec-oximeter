@@ -129,7 +129,7 @@ west build -b nrf52840dk/nrf52840 -d build/hub-other-key hub -- -DLIMITS_MASTER_
 mkdir -p build/renode && cd build/renode && renode-test ../../renode/oximeter.robot
 ```
 
-Two more boot the oximeter through MCUboot ([renode/boot.robot](renode/boot.robot)), signing their own images with MCUboot's imgtool. The first checks MCUboot starts the signed oximeter, which reports the version from its signed header; the second, that an image signed with MCUboot's published development key never runs:
+Three more boot the oximeter through MCUboot ([renode/boot.robot](renode/boot.robot)), signing their own images with MCUboot's imgtool. The first checks MCUboot starts the signed oximeter, which reports the version from its signed header; the second, that an image signed with MCUboot's published development key never runs; the third, that neither does one with a byte changed after signing:
 
 ```bash
 cd build/renode && renode-test ../../renode/boot.robot
