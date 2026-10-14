@@ -54,7 +54,7 @@ MCUboot starts before the oximeter and runs it only if the image carries a valid
 
 MCUboot checks signatures with its own copy of TinyCrypt, not the PSA Crypto the application uses. In MCUboot, PSA Crypto needs a random source, and the nRF52840's random number generator driver needs threads, which MCUboot leaves out, so it would fall back to Zephyr's test-only generator. Checking a signature needs neither randomness nor a secret, and with TinyCrypt the whole of MCUboot fits in 30 KB of its 48.
 
-An update first runs as a test. MCUboot swaps it in but keeps the image before it, and the update marks itself as working only once it passes its self-test: the sensor answered, Bluetooth is up and the analysis gave a reading. Until then, the next reset, by the watchdog if the update hangs, swaps the previous image back. Updates can't yet arrive over Bluetooth: that waits for pairing.
+An update first runs as a test. MCUboot swaps it in but keeps the image before it, and the update marks itself as working only once it passes its self-test: the sensor answered, Bluetooth is up and the analysis gave a reading. Until then, the next reset, by the watchdog if the update hangs, swaps the previous image back. Each release also carries a security counter in its signed header ([app/prj.conf](app/prj.conf)). Only a release that fixes a vulnerability raises it, and MCUboot erases any update with a lower one, so a genuine but older release can't bring a fixed vulnerability back. Updates can't yet arrive over Bluetooth: that waits for pairing.
 
 Until the debug port is locked, which only real hardware can show, anyone with a debug probe can still replace MCUboot itself.
 
@@ -131,7 +131,7 @@ west build -b nrf52840dk/nrf52840 -d build/hub-other-key hub -- -DLIMITS_MASTER_
 mkdir -p build/renode && cd build/renode && renode-test ../../renode/oximeter.robot
 ```
 
-Five more boot the oximeter through MCUboot ([renode/boot.robot](renode/boot.robot)), signing their own images with MCUboot's imgtool. The first checks MCUboot starts the signed oximeter, which reports the version from its signed header; the second, that an image signed with MCUboot's published development key never runs; the third, that neither does one with a byte changed after signing. The fourth puts an update in the second slot, marked for a test boot, and checks it marks itself as working once it has a reading and still runs after a reset; the fifth stops the sensor first and checks the update never marks itself, so a reset brings the previous version back:
+Six more boot the oximeter through MCUboot ([renode/boot.robot](renode/boot.robot)), signing their own images with MCUboot's imgtool. The first checks MCUboot starts the signed oximeter, which reports the version from its signed header; the second, that an image signed with MCUboot's published development key never runs; the third, that neither does one with a byte changed after signing. The fourth puts an update in the second slot, marked for a test boot, and checks it marks itself as working once it has a reading and still runs after a reset; the fifth stops the sensor first and checks the update never marks itself, so a reset brings the previous version back. The sixth offers an older release with a lower security counter and checks MCUboot erases it and starts the current one:
 
 ```bash
 cd build/renode && renode-test ../../renode/boot.robot
@@ -147,7 +147,7 @@ cd build/renode && renode-test ../../renode/flash.robot
 ## Layout
 
 ```
-app/            the oximeter's Zephyr application: west.yml (the Zephyr pin), prj.conf, sysbuild.conf and sysbuild.cmake (MCUboot and the release key), board overlay, src/, tests/
+app/            the oximeter's Zephyr application: west.yml (the Zephyr pin), prj.conf, sysbuild.conf, sysbuild.cmake and sysbuild/mcuboot.conf (MCUboot and the release key), board overlay, src/, tests/
 hub/            the stand-in gateway's Zephyr application, and tests for its signer
 common/         what the two applications share: Bluetooth and crypto definitions, crypto settings
 core/           the oximetry analysis, the PLX encoding, the alarm checks and signed limit changes: portable C17, no Zephyr

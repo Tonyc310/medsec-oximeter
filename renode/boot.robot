@@ -48,11 +48,12 @@ Sign The Oximeter
     Sign                      ${key}    1.0.0    ${output}    --slot-size    0x76000
 
 Sign An Update
-    [Arguments]               ${version}    ${output}
+    [Arguments]               ${version}    ${security_counter}    ${output}
     # Where an upload leaves it: swap using offset keeps slot 1's first sector free, so the image
     # starts a sector in, at 0x83000, and the rest of the slot is its own. --pad adds the mark an
     # upload's test command writes, asking MCUboot for a test boot.
     Sign                      ${RELEASE_KEY}    ${version}    ${output}
+    ...                       --security-counter    ${security_counter}
     ...                       --slot-size    0x75000    --pad    --hex-addr    0x83000
 
 *** Test Cases ***
@@ -82,7 +83,7 @@ Refuses An Image Changed After Signing
     Should Not Be On Uart     medsec-oximeter    testerId=${oximeter}    timeout=3
 
 Keeps An Update That Passes Its Self-Test
-    Sign An Update            1.1.0    ${TEST_IMAGES}/update.hex
+    Sign An Update            1.1.0    1    ${TEST_IMAGES}/update.hex
     Load The Oximeter
     Load The Update           ${TEST_IMAGES}/update.hex
     Start Emulation
@@ -92,7 +93,7 @@ Keeps An Update That Passes Its Self-Test
     Wait For Line On Uart     medsec-oximeter 1.1.0+0 started    testerId=${oximeter}
 
 Reverts An Update That Fails Its Self-Test
-    Sign An Update            1.1.0    ${TEST_IMAGES}/update.hex
+    Sign An Update            1.1.0    1    ${TEST_IMAGES}/update.hex
     Load The Oximeter
     Load The Update           ${TEST_IMAGES}/update.hex
     # The sensor answers with its part ID but sends no samples, so the analysis never runs.
@@ -102,4 +103,13 @@ Reverts An Update That Fails Its Self-Test
     # Longer than a working sensor takes to give the first reading.
     Should Not Be On Uart     image marked as working    testerId=${oximeter}    timeout=10
     Reset The Oximeter
+    Wait For Line On Uart     medsec-oximeter 1.0.0+0 started    testerId=${oximeter}
+
+Refuses An Older Release
+    # A genuine release from before a security fix, with the lower counter it shipped with.
+    Sign An Update            0.9.0    0    ${TEST_IMAGES}/older.hex
+    Load The Oximeter
+    Load The Update           ${TEST_IMAGES}/older.hex
+    Start Emulation
+    Wait For Line On Uart     erased due to downgrade prevention    testerId=${oximeter}
     Wait For Line On Uart     medsec-oximeter 1.0.0+0 started    testerId=${oximeter}
