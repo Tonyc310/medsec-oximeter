@@ -10,6 +10,7 @@ set(CORE ${CMAKE_CURRENT_SOURCE_DIR}/../core)
 target_sources(app PRIVATE src/main.c src/alarm_service.c src/device_identity.c src/event_log.c
     src/limits_crypto.c src/limits_store.c src/plx_service.c src/supervisor.c
     ${CORE}/src/alarm.c ${CORE}/src/device_key.c ${CORE}/src/limits_auth.c ${CORE}/src/oximetry.c ${CORE}/src/plx.c
-    ${CORE}/src/security_log.c ${CORE}/src/supervision.c)
+    ${CORE}/src/security_log.c ${CORE}/src/supervision.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../common/src/medsec_crypto.c)
 # common/ holds what the oximeter and the hub share.
 target_include_directories(app PRIVATE ${CORE}/include ${CMAKE_CURRENT_SOURCE_DIR}/../common/include)
