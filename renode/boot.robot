@@ -15,6 +15,7 @@ ${PROGRAM_BYTE}             0xD000
 # Checking signatures needs no device keys.
 ${UNPROVISIONED}            ${CURDIR}/unprovisioned.resc
 ${UART}                     sysbus.uart0
+${SENSOR}                   sysbus.twi0.max30101
 
 *** Keywords ***
 Load The Oximeter
@@ -89,3 +90,16 @@ Keeps An Update That Passes Its Self-Test
     Wait For Line On Uart     image marked as working    testerId=${oximeter}    timeout=10
     Reset The Oximeter
     Wait For Line On Uart     medsec-oximeter 1.1.0+0 started    testerId=${oximeter}
+
+Reverts An Update That Fails Its Self-Test
+    Sign An Update            1.1.0    ${TEST_IMAGES}/update.hex
+    Load The Oximeter
+    Load The Update           ${TEST_IMAGES}/update.hex
+    # The sensor answers with its part ID but sends no samples, so the analysis never runs.
+    Execute Command           ${SENSOR} Stopped true
+    Start Emulation
+    Wait For Line On Uart     medsec-oximeter 1.1.0+0 started    testerId=${oximeter}
+    # Longer than a working sensor takes to give the first reading.
+    Should Not Be On Uart     image marked as working    testerId=${oximeter}    timeout=10
+    Reset The Oximeter
+    Wait For Line On Uart     medsec-oximeter 1.0.0+0 started    testerId=${oximeter}
