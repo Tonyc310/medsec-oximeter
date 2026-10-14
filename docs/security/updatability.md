@@ -6,7 +6,7 @@ How a software fix reaches the oximeter and the bedside gateway, end to end: fro
 
 ## Today
 
-There is no update path (T-32). The oximeter's firmware can only be changed through its SWD debug port (I-4), which is unlocked and accepts any image (T-14). The hub, the gateway's stand-in, is the same. Fixing a vulnerability would mean physically reaching every device.
+There is no update path yet (T-32). The oximeter's firmware can only be changed through its SWD debug port (I-4), which is unlocked. MCUboot runs only an image signed with the release key, but through the unlocked port anyone can replace MCUboot too (T-14). The hub, the gateway's stand-in, has no MCUboot and no update path. Fixing a vulnerability would mean physically reaching every device.
 
 Everything below is the design Phase 4 builds. Each part says whether it exists yet.
 
@@ -54,15 +54,15 @@ Hop 4 relies on the Bluetooth pairing and bonding that Phase 4 adds for the read
 
 ## Verification on the oximeter
 
-| What | Design | Why | Threat |
-|---|---|---|---|
-| Signature | ECDSA P-256 with SHA-256 over the image and its header, checked by MCUboot; the public key is built into MCUboot | a NIST-approved algorithm (FIPS 186-5) with 128-bit security, supported by MCUboot at the commit Zephyr v4.4.2 pins | T-33 |
-| Check on every boot | the running image's signature is checked at each boot, not only after an update (`BOOT_VALIDATE_SLOT0`, MCUboot's default) | an image altered in flash some other way still won't run | T-14 |
-| Rollback | each image carries a security counter in its signed metadata. MCUboot refuses an update whose counter is below the running image's. A release that fixes a vulnerability raises the counter, which blocks every image before it (`MCUBOOT_DOWNGRADE_PREVENTION_SECURITY_COUNTER`) | a genuine but older image would reopen a fixed vulnerability | T-34 |
-| Debug port | locked at startup (`CONFIG_NRF_APPROTECT_LOCK`) | MCUboot's own documentation notes that its rollback check can be bypassed by writing flash through a debug port. Signature, rollback and debug lock only work together | T-14, T-15 |
-| Flash layout | the nRF52840 DK's standard partitions: MCUboot 48 KB, two image slots of 472 KB, storage 32 KB | the image is 134 KB today. FDA asks for room for future patches, and each slot has more than three times what's needed now | T-32 |
+| What | Design | Why | Threat | Status |
+|---|---|---|---|---|
+| Signature | ECDSA P-256 with SHA-256 over the image and its header, checked by MCUboot; the public key is built into MCUboot | a NIST-approved algorithm (FIPS 186-5) with 128-bit security, supported by MCUboot at the commit Zephyr v4.4.2 pins | T-33 | done |
+| Check on every boot | the running image's signature is checked at each boot, not only after an update (`BOOT_VALIDATE_SLOT0`, MCUboot's default) | an image altered in flash some other way still won't run | T-14 | done |
+| Rollback | each image carries a security counter in its signed metadata. MCUboot refuses an update whose counter is below the running image's. A release that fixes a vulnerability raises the counter, which blocks every image before it (`MCUBOOT_DOWNGRADE_PREVENTION_SECURITY_COUNTER`) | a genuine but older image would reopen a fixed vulnerability | T-34 | planned |
+| Debug port | locked at startup (`CONFIG_NRF_APPROTECT_LOCK`) | MCUboot's own documentation notes that its rollback check can be bypassed by writing flash through a debug port. Signature, rollback and debug lock only work together | T-14, T-15 | planned, needs hardware |
+| Flash layout | the nRF52840 DK's standard partitions: MCUboot 48 KB, two image slots of 472 KB, storage 32 KB | MCUboot takes 30 KB and the image 167 KB today. FDA asks for room for future patches, and each slot has almost three times what's needed now | T-32 | done |
 
-The release key never leaves the build environment (DS-5): an attacker with it can sign anything (T-35). Phase 4 decides where it lives and who can use it. The key MCUboot trusts is built into MCUboot, which can't be updated in this design, so replacing a compromised key needs physical access to every device. That limitation goes into the risk assessment.
+The release key never leaves the build environment (DS-5): an attacker with it can sign anything (T-35). In this project the build makes one per checkout, in `build/release-key.pem`, never committed, so no two checkouts share a key. A product keeps its release key in an offline signing service, which only the release process can use. MCUboot's own development key, sysbuild's default, is never used: its private half is published with MCUboot, and a test checks that an image signed with it doesn't run. The key MCUboot trusts is built into MCUboot, which can't be updated in this design, so replacing a compromised key needs physical access to every device. That limitation goes into the risk assessment.
 
 ## Interrupted and failed updates
 
@@ -110,6 +110,7 @@ A compromised server or gateway can withhold or delay updates, a denial of servi
 | Zephyr, pinned to v4.4.2 in `app/west.yml` | oximeter | move the pin to the patch release with the fix, rebuild, ship through the path above |
 | Zephyr's Bluetooth controller (`CONFIG_BT_LL_SW_SPLIT`) | oximeter | built into the same image, so controller fixes ship with the firmware: no separate radio firmware to update |
 | MCUboot | oximeter | MCUboot can't replace itself in this design. A bootloader fix needs physical access, so MCUboot is kept minimal and its configuration fixed. Its vulnerabilities are assessed like any other component's (Phase 5) |
+| TinyCrypt, MCUboot's own copy | oximeter, inside MCUboot | built into MCUboot, so a fix needs physical access, as MCUboot's does. It checks signatures instead of PSA Crypto, which the app uses: in MCUboot, PSA Crypto needs a random source, and with no threads for the nRF52840's random number generator driver it falls back to Zephyr's test-only generator. The original TinyCrypt project is no longer maintained, so MCUboot's copy is watched like MCUboot itself. Checking a signature handles no secret, so timing leaks don't apply to it |
 | Linux, Buildroot packages | gateway | Buildroot LTS patch releases, shipped as gateway bundles |
 
 FDA also asks manufacturers to keep everything needed to build and test a patch long after release. Here the build is fully pinned: the west manifest, the Zephyr SDK version and the CI configuration. The whole system also runs in Renode with no hardware, so a fix can be tested end to end on any machine years from now. The SBOM in Phase 5 lists every component, and the postmarket plan in Phase 7 covers monitoring them and how fast fixes ship. Security fixes ship as their own releases, not waiting for feature releases.
