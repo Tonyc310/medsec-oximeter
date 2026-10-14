@@ -5,6 +5,6 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(limits_crypto_tests LANGUAGES C)
 
 set(APP ${CMAKE_CURRENT_SOURCE_DIR}/../..)
-target_sources(app PRIVATE src/main.c ${APP}/src/limits_crypto.c
+target_sources(app PRIVATE src/main.c ${APP}/src/limits_crypto.c ${APP}/src/log_mac.c
     ${APP}/../common/src/medsec_crypto.c)
 target_include_directories(app PRIVATE ${APP}/src ${APP}/../core/include ${APP}/../common/include)

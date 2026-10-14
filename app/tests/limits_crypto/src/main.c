@@ -1,4 +1,5 @@
 #include "limits_crypto.h"
+#include "log_mac.h"
 
 #include <psa/crypto.h>
 #include <zephyr/ztest.h>
@@ -99,6 +100,24 @@ ZTEST(limits_crypto, test_reports_failure_when_the_generator_is_not_running)
 
     mbedtls_psa_crypto_free();
     zassert_false(limits_crypto.random(challenge, sizeof challenge));
+}
+
+/* The log is tagged with the same MAC as limit changes, with a key that may only make tags. */
+ZTEST(limits_crypto, test_tags_log_records_as_rfc4231_does)
+{
+    uint8_t tag[SECURITY_LOG_TAG_SIZE];
+
+    zassert_true(log_mac_init(cases[2].key, cases[2].key_length));
+    zassert_true(log_mac_tag((const uint8_t *)cases[2].data, strlen(cases[2].data), tag));
+    zassert_mem_equal(tag, cases[2].tag, sizeof tag);
+}
+
+ZTEST(limits_crypto, test_makes_no_log_tag_without_a_key)
+{
+    uint8_t tag[SECURITY_LOG_TAG_SIZE];
+
+    zassert_false(log_mac_init(cases[2].key, 0u));
+    zassert_false(log_mac_tag((const uint8_t *)cases[2].data, strlen(cases[2].data), tag));
 }
 
 /* Every test starts with test case 5's key loaded. */

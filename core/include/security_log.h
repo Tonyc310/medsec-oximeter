@@ -11,6 +11,8 @@
  * repeat, so a gap shows a lost record. */
 #define SECURITY_LOG_RECORD_SIZE 20u
 #define SECURITY_LOG_DETAIL_SIZE 9u
+/* Each record is kept and sent with a tag: a MAC under the device's log key, over its 20 bytes. */
+#define SECURITY_LOG_TAG_SIZE 16u
 /* The newest records kept; older ones are overwritten. */
 #define SECURITY_LOG_CAPACITY 64u
 
