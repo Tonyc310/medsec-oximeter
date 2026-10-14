@@ -48,7 +48,7 @@ sequenceDiagram
 | 2 | E-5 to E-3 | signed image, version, security counter, target hardware | HTTPS, TLS 1.3 | server certificate; at home over the internet, on a ward the hospital's server fetches it | planned |
 | 3 | E-3 to E-2 | signed image | HTTPS, TLS 1.3, both sides authenticated by certificate (I-6) | the gateway only accepts updates from its own backend | planned |
 | 4 | E-2 to E-1 | signed image, upload and test commands | MCUmgr SMP over Bluetooth LE: service `8d53dc1d-1db7-4cd3-868b-8a527460aa84`, characteristic `da2e7828-fbce-4e01-ae9e-261174997c48` (I-8) | the SMP characteristic requires an encrypted, authenticated link. With pairing allowed only while a device is being set up (Phase 4), that means the bonded gateway | planned |
-| 5 | slot 1 to slot 0 | the image | MCUboot, on the device | signature and security counter checked before the image is used | planned |
+| 5 | slot 1 to slot 0 | the image | MCUboot, on the device | signature and security counter checked before the image is used | done |
 
 Hop 4 relies on the Bluetooth pairing and bonding that Phase 4 adds for the readings and the alarm limits. Zephyr's SMP transport already defaults to requiring an authenticated link once pairing is enabled (`CONFIG_MCUMGR_TRANSPORT_BT_PERM_RW_AUTHEN`). Without it, anyone in radio range could upload; the signature check would still stop them installing anything the manufacturer didn't sign.
 
@@ -58,7 +58,7 @@ Hop 4 relies on the Bluetooth pairing and bonding that Phase 4 adds for the read
 |---|---|---|---|---|
 | Signature | ECDSA P-256 with SHA-256 over the image and its header, checked by MCUboot; the public key is built into MCUboot | a NIST-approved algorithm (FIPS 186-5) with 128-bit security, supported by MCUboot at the commit Zephyr v4.4.2 pins | T-33 | done |
 | Check on every boot | the running image's signature is checked at each boot, not only after an update (`BOOT_VALIDATE_SLOT0`, MCUboot's default) | an image altered in flash some other way still won't run | T-14 | done |
-| Rollback | each image carries a security counter in its signed metadata. MCUboot refuses an update whose counter is below the running image's. A release that fixes a vulnerability raises the counter, which blocks every image before it (`MCUBOOT_DOWNGRADE_PREVENTION_SECURITY_COUNTER`) | a genuine but older image would reopen a fixed vulnerability | T-34 | planned |
+| Rollback | each image carries a security counter in its signed metadata. MCUboot refuses an update whose counter is below the running image's. A release that fixes a vulnerability raises the counter, which blocks every image before it (`MCUBOOT_DOWNGRADE_PREVENTION_SECURITY_COUNTER`) | a genuine but older image would reopen a fixed vulnerability | T-34 | done |
 | Debug port | locked at startup (`CONFIG_NRF_APPROTECT_LOCK`) | MCUboot's own documentation notes that its rollback check can be bypassed by writing flash through a debug port. Signature, rollback and debug lock only work together | T-14, T-15 | planned, needs hardware |
 | Flash layout | the nRF52840 DK's standard partitions: MCUboot 48 KB, two image slots of 472 KB, storage 32 KB | MCUboot takes 30 KB and the image 167 KB today. FDA asks for room for future patches, and each slot has almost three times what's needed now | T-32 | done |
 
@@ -71,7 +71,7 @@ FDA asks what happens when an update is interrupted, at each phase of the proces
 | What happens | Result | Status |
 |---|---|---|
 | The Bluetooth link drops during the upload | slot 1 holds a partial image that is never booted. The running image is untouched, and the gateway starts the upload again on the next connection | planned |
-| The image fails its signature or rollback check | MCUboot leaves it in slot 1, unused, and boots the current image. The app reports the rejection to the gateway and records it in the security log | planned |
+| The image fails its signature or rollback check | MCUboot erases it from slot 1 and boots the current image. The app is to report the rejection to the gateway and record it in the security log, with the upload (hop 4) | MCUboot's part done; reporting planned |
 | Power is lost during the swap | MCUboot records the swap's progress in the slots' trailers and finishes it after the next reset. MCUboot's own simulator tests this, cutting power at each flash write of a swap in turn, and its CI runs it with swap using offset; Renode tests here would add nothing to that | done, MCUboot's tests |
 | The new image boots but doesn't pass its self-test, or hangs | it never marks itself OK. A watchdog (T-17) resets a hung image. At the next reset MCUboot swaps the previous image back | done |
 | The new image passes its self-test | it marks itself OK and the swap becomes permanent | done |
