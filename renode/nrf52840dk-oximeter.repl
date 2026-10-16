@@ -8,6 +8,9 @@ max30101: Sensors.MAX30101 @ twi0 0x57
 nvmc: Miscellaneous.NRF52840_NVMC @ sysbus 0x4001E000
     flash: flash
 
+// Nor of the CCM, which encrypts and decrypts Bluetooth packets: Ccm.cs adds one.
+ccm: Miscellaneous.NRF52840_CCM @ sysbus 0x4000F000
+
 // FICR, which Renode leaves at zero: the flash geometry Zephyr's driver reads, 256 pages of 4 KB,
 // and a device ID (0123456789abcdef, as hwinfo gives it). A new chip's flash is erased, all ones.
 sysbus:
