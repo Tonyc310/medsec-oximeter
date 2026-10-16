@@ -112,3 +112,14 @@ Passes An Empty Packet Through Unencrypted
     [Template]                Should Leave An Empty Packet As It Is
     Encrypt
     Decrypt
+
+Signals The End Of Decryption With An Interrupt
+    # Zephyr's controller sleeps until this interrupt, to check the MIC of the packet it received.
+    Create The Platform
+    Configure The Link        0    1
+    Execute Command           ${CCM} WriteDoubleWord 0x304 0x2
+    Decrypt                   0f05009fcda7f448
+    ${ended}=                 Execute Command    ${CCM} ReadDoubleWord 0x104
+    Should Be Equal As Integers    ${ended.strip()}    1
+    ${interrupt}=             Execute Command    ${CCM} IRQ IsSet
+    Should Contain            ${interrupt}    True

@@ -7,8 +7,9 @@ using Antmicro.Renode.Utilities.Crypto;
 namespace Antmicro.Renode.Peripherals.Miscellaneous
 {
     // The nRF52840's AES CCM block (CCM): what Zephyr's Bluetooth controller needs to encrypt and
-    // decrypt packets on an encrypted link. Operations finish at once, so the key-stream task does
-    // nothing itself except start encryption through its shortcut. ENABLE and the data rate are
+    // decrypt packets on an encrypted link. Operations finish at once: generating the key stream
+    // only signals its end, and starts encryption through its shortcut. Nothing here fails, so
+    // ERROR never fires. ENABLE, the data rate, the scratch area and the maximum packet size are
     // accepted and ignored.
     //
     // Packets in RAM are a header byte, a length byte and a spare byte (S1), then the payload: the
@@ -18,17 +19,32 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
     {
         public NRF52840_CCM(IMachine machine) : base(machine)
         {
+            IRQ = new GPIO();
             DefineRegisters();
         }
 
+        public override void Reset()
+        {
+            base.Reset();
+            IRQ.Unset();
+        }
+
         public long Size => 0x1000;
+
+        public GPIO IRQ { get; }
 
         private void DefineRegisters()
         {
             Registers.GenerateKeyStream.Define(this)
                 .WithFlag(0, FieldMode.Write, writeCallback: (_, value) =>
                 {
-                    if(value && cryptAfterKeyStream.Value)
+                    if(!value)
+                    {
+                        return;
+                    }
+                    keyStreamEnded.Value = true;
+                    UpdateInterrupt();
+                    if(cryptAfterKeyStream.Value)
                     {
                         Crypt();
                     }
@@ -45,9 +61,42 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
                 }, name: "TASKS_CRYPT")
                 .WithReservedBits(1, 31);
 
+            Registers.KeyStreamEnded.Define(this)
+                .WithFlag(0, out keyStreamEnded, name: "EVENTS_ENDKSGEN")
+                .WithReservedBits(1, 31)
+                .WithWriteCallback((_, __) => UpdateInterrupt());
+
+            Registers.CryptEnded.Define(this)
+                .WithFlag(0, out cryptEnded, name: "EVENTS_ENDCRYPT")
+                .WithReservedBits(1, 31)
+                .WithWriteCallback((_, __) => UpdateInterrupt());
+
+            Registers.Error.Define(this)
+                .WithFlag(0, out error, name: "EVENTS_ERROR")
+                .WithReservedBits(1, 31)
+                .WithWriteCallback((_, __) => UpdateInterrupt());
+
             Registers.Shortcuts.Define(this)
                 .WithFlag(0, out cryptAfterKeyStream, name: "ENDKSGEN_CRYPT")
                 .WithReservedBits(1, 31);
+
+            Registers.InterruptEnableSet.Define(this)
+                .WithFlag(0, out keyStreamInterrupt, FieldMode.Set | FieldMode.Read,
+                    name: "ENDKSGEN")
+                .WithFlag(1, out cryptInterrupt, FieldMode.Set | FieldMode.Read, name: "ENDCRYPT")
+                .WithFlag(2, out errorInterrupt, FieldMode.Set | FieldMode.Read, name: "ERROR")
+                .WithReservedBits(3, 29)
+                .WithWriteCallback((_, __) => UpdateInterrupt());
+
+            Registers.InterruptEnableClear.Define(this)
+                .WithFlag(0, writeCallback: (_, value) => keyStreamInterrupt.Value &= !value,
+                    valueProviderCallback: _ => keyStreamInterrupt.Value, name: "ENDKSGEN")
+                .WithFlag(1, writeCallback: (_, value) => cryptInterrupt.Value &= !value,
+                    valueProviderCallback: _ => cryptInterrupt.Value, name: "ENDCRYPT")
+                .WithFlag(2, writeCallback: (_, value) => errorInterrupt.Value &= !value,
+                    valueProviderCallback: _ => errorInterrupt.Value, name: "ERROR")
+                .WithReservedBits(3, 29)
+                .WithWriteCallback((_, __) => UpdateInterrupt());
 
             Registers.MicStatus.Define(this)
                 .WithFlag(0, out micValid, FieldMode.Read, name: "MICSTATUS")
@@ -73,9 +122,23 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
 
             Registers.OutputPointer.Define(this)
                 .WithValueField(0, 32, out outputPointer, name: "OUTPTR");
+
+            Registers.ScratchPointer.Define(this)
+                .WithValueField(0, 32, name: "SCRATCHPTR");
+
+            Registers.MaxPacketSize.Define(this, 0xFB)
+                .WithValueField(0, 8, name: "MAXPACKETSIZE")
+                .WithReservedBits(8, 24);
         }
 
         private void Crypt()
+        {
+            CryptPacket();
+            cryptEnded.Value = true;
+            UpdateInterrupt();
+        }
+
+        private void CryptPacket()
         {
             var configuration = sysbus.ReadBytes(configurationPointer.Value, ConfigurationSize);
             var header = sysbus.ReadBytes(inputPointer.Value, HeaderSize);
@@ -107,6 +170,13 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             }
         }
 
+        private void UpdateInterrupt()
+        {
+            IRQ.Set((keyStreamEnded.Value && keyStreamInterrupt.Value)
+                || (cryptEnded.Value && cryptInterrupt.Value)
+                || (error.Value && errorInterrupt.Value));
+        }
+
         // The configuration holds the 39-bit packet counter least significant byte first, then the
         // direction bit (1 for packets from the central) and the IV. The nonce is the counter's
         // first 5 bytes with the direction bit on top, then the IV.
@@ -120,6 +190,12 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             return nonce;
         }
 
+        private IFlagRegisterField keyStreamEnded;
+        private IFlagRegisterField cryptEnded;
+        private IFlagRegisterField error;
+        private IFlagRegisterField keyStreamInterrupt;
+        private IFlagRegisterField cryptInterrupt;
+        private IFlagRegisterField errorInterrupt;
         private IFlagRegisterField cryptAfterKeyStream;
         private IFlagRegisterField micValid;
         private IFlagRegisterField decrypt;
@@ -141,13 +217,20 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         {
             GenerateKeyStream = 0x000,
             Crypt = 0x004,
+            KeyStreamEnded = 0x100,
+            CryptEnded = 0x104,
+            Error = 0x108,
             Shortcuts = 0x200,
+            InterruptEnableSet = 0x304,
+            InterruptEnableClear = 0x308,
             MicStatus = 0x400,
             Enable = 0x500,
             Mode = 0x504,
             ConfigurationPointer = 0x508,
             InputPointer = 0x50C,
             OutputPointer = 0x510,
+            ScratchPointer = 0x514,
+            MaxPacketSize = 0x518,
         }
 
         // AES-CCM as Bluetooth uses it (Core specification Vol 6, Part E, 1): a 13-byte nonce, the

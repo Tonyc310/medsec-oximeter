@@ -146,7 +146,7 @@ west build -b nrf52840dk/nrf52840 -d build/flash-test deps/zephyr/tests/drivers/
 cd build/renode && renode-test ../../renode/flash.robot
 ```
 
-The last checks the CCM model against the Bluetooth Core specification's sample data (Vol 6, Part C): it encrypts and decrypts the specification's packets byte for byte, reports a packet it can't authenticate, and passes empty packets through unencrypted:
+The last checks the CCM model against the Bluetooth Core specification's sample data (Vol 6, Part C): it encrypts and decrypts the specification's packets byte for byte, reports a packet it can't authenticate, passes empty packets through unencrypted, and signals the end of decryption with the interrupt Zephyr's controller waits for:
 
 ```bash
 cd build/renode && renode-test ../../renode/ccm.robot

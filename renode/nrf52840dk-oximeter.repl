@@ -10,6 +10,7 @@ nvmc: Miscellaneous.NRF52840_NVMC @ sysbus 0x4001E000
 
 // Nor of the CCM, which encrypts and decrypts Bluetooth packets: Ccm.cs adds one.
 ccm: Miscellaneous.NRF52840_CCM @ sysbus 0x4000F000
+    IRQ -> nvic@15
 
 // FICR, which Renode leaves at zero: the flash geometry Zephyr's driver reads, 256 pages of 4 KB,
 // and a device ID (0123456789abcdef, as hwinfo gives it). A new chip's flash is erased, all ones.
