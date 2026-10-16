@@ -1,9 +1,9 @@
 #include "alarm.h"
 #include "device_keys.h"
 #include "limits_auth.h"
-#include "limits_master.h"
 #include "limits_signer.h"
 #include "log_verifier.h"
+#include "masters.h"
 #include "medsec_bt.h"
 #include "plx.h"
 #include "security_log.h"
@@ -133,8 +133,8 @@ static void subscribe(struct bt_conn *conn, struct bt_gatt_subscribe_params *sub
 }
 
 /* Standing in for the backend, the hub derives the keys the factory gave this oximeter: one to sign
- * its limit changes, one to check its log. Only that device's keys are loaded; the master stays
- * with the hub. */
+ * its limit changes, one to check its log. Only that device's keys are loaded; the signing
+ * master stays with the hub. */
 static uint8_t on_device_id(struct bt_conn *conn, uint8_t err, struct bt_gatt_read_params *params,
                             const void *data, uint16_t length)
 {
@@ -151,11 +151,11 @@ static uint8_t on_device_id(struct bt_conn *conn, uint8_t err, struct bt_gatt_re
 
     const uint8_t *id = data;
     bool ready =
-        device_keys_derive(limits_master, sizeof limits_master, DEVICE_KEY_LIMITS, id, key) &&
+        device_keys_derive(signing_master, sizeof signing_master, DEVICE_KEY_LIMITS, id, key) &&
         limits_signer_init(key, sizeof key);
 
     ready = ready &&
-            device_keys_derive(limits_master, sizeof limits_master, DEVICE_KEY_LOG, id, key) &&
+            device_keys_derive(signing_master, sizeof signing_master, DEVICE_KEY_LOG, id, key) &&
             log_verifier_init(key, sizeof key);
 
     mbedtls_platform_zeroize(key, sizeof key);

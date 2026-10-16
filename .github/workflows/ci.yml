@@ -82,7 +82,7 @@ jobs:
           west build --sysbuild -b nrf52840dk/nrf52840 -d build/oximeter app
           west build -b nrf52840dk/nrf52840 -d build/hub hub
           west build -b nrf52840dk/nrf52840 -d build/hub-other-key hub -- \
-            -DLIMITS_MASTER_FILE=$PWD/build/other-master.key
+            -DSIGNING_MASTER_FILE=$PWD/build/other-signing-master.key
           west build -b nrf52840dk/nrf52840 -d build/flash-test deps/zephyr/tests/drivers/flash/common \
             -- -DCONFIG_TEST_FORCE_STORAGE_PARTITION=y
 

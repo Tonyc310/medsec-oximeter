@@ -7,7 +7,7 @@ ${HUB_ELF}                  ${CURDIR}/../build/hub/zephyr/zephyr.elf
 # The same hub built with a master of its own, as a gateway that can't make this oximeter's key.
 ${HUB_OTHER_KEY_ELF}        ${CURDIR}/../build/hub-other-key/zephyr/zephyr.elf
 ${SCRIPT}                   ${CURDIR}/oximeter.resc
-${MASTER}                   ${CURDIR}/../build/limits-master.key
+${SIGNING_MASTER}           ${CURDIR}/../build/signing-master.key
 # The simulated oximeter's ID: the FICR DEVICEID values in nrf52840dk-oximeter.repl.
 ${DEVICE_ID}                0123456789abcdef
 ${PROVISIONED}              ${CURDIR}/../build/renode/provision.resc
@@ -19,9 +19,9 @@ ${ALARM_LED}                sysbus.gpio0.led0
 *** Keywords ***
 Start System
     [Arguments]               ${hub_elf}=${HUB_ELF}    ${provisioning}=${PROVISIONED}
-    # The factory derives the oximeter's key from the master and its ID, as the hub does.
+    # The factory derives the oximeter's keys from the signing master and its ID, as the hub does.
     ${result}=                Run Process    python3    ${CURDIR}/../tools/provision.py
-    ...                       --master    ${MASTER}    --device-id    ${DEVICE_ID}    --renode    ${PROVISIONED}
+    ...                       --signing-master    ${SIGNING_MASTER}    --device-id    ${DEVICE_ID}    --renode    ${PROVISIONED}
     Should Be Equal As Integers    ${result.rc}    0    ${result.stderr}
     Execute Command           $oximeter_image=@${OXIMETER_IMAGE}
     Execute Command           $hub_bin=@${hub_elf}
@@ -148,10 +148,10 @@ Verifies Every Record Of The Log
     Write Line To Uart        log    testerId=${hub}
     Wait For Line On Uart     3 security records, 3 verified    testerId=${hub}
 
-Can't Verify The Log Without The Master
+Can't Verify The Log Without The Signing Master
     Start System              ${HUB_OTHER_KEY_ELF}
     Monitor A Patient At 94 Percent
 
-    # A gateway without the master can read the log but can neither vouch for it nor forge it.
+    # A gateway without the signing master can read the log but can neither vouch for it nor forge it.
     Write Line To Uart        log    testerId=${hub}
     Wait For Line On Uart     [0-9]+ security records, 0 verified    testerId=${hub}    treatAsRegex=true

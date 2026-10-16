@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Provision an oximeter's keys, as the factory would.
 
-Derives the device's limits key and log key from the master secret and the device ID the way the
-backend does, with HKDF-SHA256 (RFC 5869), and gives the UICR words to write: as a list, or as a
-Renode script that writes them into the simulated oximeter.
+Derives the device's limits key and log key from the backend's signing master and the device ID
+the way the backend does, with HKDF-SHA256 (RFC 5869), and gives the UICR words to write: as a
+list, or as a Renode script that writes them into the simulated oximeter.
 """
 
 import argparse
@@ -58,12 +58,14 @@ def read_hex(text: str, size: int, what: str) -> bytes:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--master", type=Path, required=True, help="file holding the master, hex")
+    parser.add_argument(
+        "--signing-master", type=Path, required=True, help="file holding the signing master, hex"
+    )
     parser.add_argument("--device-id", required=True, help="the device's ID, 16 hex digits")
     parser.add_argument("--renode", type=Path, help="write a Renode script here instead of a list")
     args = parser.parse_args()
 
-    master = read_hex(args.master.read_text(), KEY_SIZE, str(args.master))
+    master = read_hex(args.signing_master.read_text(), KEY_SIZE, str(args.signing_master))
     device_id = read_hex(args.device_id, DEVICE_ID_SIZE, "the device ID")
     words = uicr_words(device_keys(master, device_id))
 

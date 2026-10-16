@@ -1,0 +1,3 @@
+#include "masters.h"
+
+const uint8_t @MASTER_NAME@[MASTER_SIZE] = {@MASTER_BYTES@};

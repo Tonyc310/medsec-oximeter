@@ -11,4 +11,5 @@ target_sources(app PRIVATE src/main.c src/device_keys.c src/limits_signer.c src/
     ${CORE}/src/limits_auth.c ${CORE}/src/plx.c ${CORE}/src/security_log.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../common/src/medsec_crypto.c)
 target_include_directories(app PRIVATE ${CORE}/include ${CMAKE_CURRENT_SOURCE_DIR}/../common/include)
-include(${CMAKE_CURRENT_SOURCE_DIR}/../common/limits_master.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../common/master.cmake)
+medsec_master(signing)
