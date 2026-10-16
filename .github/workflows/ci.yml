@@ -72,6 +72,8 @@ jobs:
           build/limits_store/zephyr/zephyr.exe -flash_in_ram
           west build -b native_sim/native/64 -d build/event_log app/tests/event_log
           build/event_log/zephyr/zephyr.exe -flash_in_ram
+          west build -b native_sim/native/64 -d build/pairing_seal common/tests/pairing_seal
+          build/pairing_seal/zephyr/zephyr.exe
 
       # The second hub has a master of its own, for the test that a stranger's change is refused.
       # Zephyr's flash driver tests, on the internal flash, check the flash controller model.
