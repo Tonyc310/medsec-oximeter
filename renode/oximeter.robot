@@ -8,6 +8,9 @@ ${HUB_ELF}                  ${CURDIR}/../build/hub/zephyr/zephyr.elf
 # sign for; and with both masters of its own, as a stranger.
 ${HUB_OTHER_KEY_ELF}        ${CURDIR}/../build/hub-other-key/zephyr/zephyr.elf
 ${HUB_STRANGER_ELF}         ${CURDIR}/../build/hub-stranger/zephyr/zephyr.elf
+# Zephyr's Bluetooth shell (tests/bluetooth/shell) in the hub's place: a phone in range, trying
+# what any central can.
+${PHONE_ELF}                ${CURDIR}/../build/phone/zephyr/zephyr.elf
 ${SCRIPT}                   ${CURDIR}/oximeter.resc
 ${SIGNING_MASTER}           ${CURDIR}/../build/signing-master.key
 ${PAIRING_MASTER}           ${CURDIR}/../build/pairing-master.key
@@ -63,6 +66,30 @@ Can't Pair With A Hub Without The Pairing Master
     # It can read the sealed pairing data but not open it, so it never pairs and hears nothing.
     Wait For Line On Uart     couldn't open the oximeter's pairing data    testerId=${hub}    timeout=10
     Should Not Be On Uart     hub: (SpO2|no reading)    testerId=${hub}    timeout=5    treatAsRegex=true
+
+Refuses A Phone That Pairs With Just Works
+    Start System              ${PHONE_ELF}
+    Start Emulation
+    Wait For Line On Uart     to initialize the stack    testerId=${hub}
+    Write Line To Uart        bt init    testerId=${hub}
+    Wait For Line On Uart     Bluetooth initialized    testerId=${hub}
+    Write Line To Uart        bt connect-name medsec-oximeter    testerId=${hub}
+    Wait For Line On Uart     Connected:    testerId=${hub}    timeout=10
+    # Unauthenticated pairing, as a phone without the oximeter's sealed data would try.
+    Write Line To Uart        bt security 2    testerId=${hub}
+    Wait For Line On Uart     Security failed:    testerId=${hub}    timeout=10
+    # Unpaired, it can read neither the readings service nor the security log: insufficient
+    # authentication. The shell reads by 16-bit UUID, so the log is read by its handle, the one
+    # after its declaration's.
+    Write Line To Uart        gatt read-uuid 2a60    testerId=${hub}
+    Wait For Line On Uart     Read complete: err 0x05    testerId=${hub}    timeout=10
+    Write Line To Uart        gatt discover-characteristic    testerId=${hub}
+    ${found}=                 Wait For Line On Uart    Characteristic 2f6a0005-0f8a-4e3c-9d2b-6c1e4a7b9d10 found: handle ([0-9a-f]+)
+    ...                       testerId=${hub}    treatAsRegex=true    timeout=10
+    ${handle}=                Evaluate    hex(int(re.search("handle ([0-9a-f]+)", str($found)).group(1), 16) + 1)
+    ...                       modules=re
+    Write Line To Uart        gatt read ${handle}    testerId=${hub}
+    Wait For Line On Uart     Read complete: err 0x05    testerId=${hub}    timeout=10
 
 Sends Readings To The Hub And Alarms On Limits It Signs
     Start System

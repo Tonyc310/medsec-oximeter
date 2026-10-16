@@ -76,8 +76,9 @@ jobs:
           build/pairing_seal/zephyr/zephyr.exe
 
       # Two more hubs: one with a signing master of its own, a gateway the backend let pair but won't
-      # sign for; one with both masters of its own, a stranger. Zephyr's flash driver tests, on the
-      # internal flash, check the flash controller model.
+      # sign for; one with both masters of its own, a stranger. Zephyr's Bluetooth shell plays a
+      # phone, keeping no bonds since Renode's board for it has no flash controller. Zephyr's flash
+      # driver tests, on the internal flash, check the flash controller model.
       - name: Build the firmware
         run: |
           west build --sysbuild -b nrf52840dk/nrf52840 -d build/oximeter app
@@ -87,6 +88,8 @@ jobs:
           west build -b nrf52840dk/nrf52840 -d build/hub-stranger hub -- \
             -DSIGNING_MASTER_FILE=$PWD/build/other-signing-master.key \
             -DPAIRING_MASTER_FILE=$PWD/build/other-pairing-master.key
+          west build -b nrf52840dk/nrf52840 -d build/phone deps/zephyr/tests/bluetooth/shell -- \
+            -DCONFIG_BT_SETTINGS=n
           west build -b nrf52840dk/nrf52840 -d build/flash-test deps/zephyr/tests/drivers/flash/common \
             -- -DCONFIG_TEST_FORCE_STORAGE_PARTITION=y
 
