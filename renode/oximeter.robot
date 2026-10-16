@@ -5,8 +5,9 @@ Library                     Process
 ${OXIMETER_IMAGE}           ${CURDIR}/../build/oximeter/app/zephyr/zephyr.signed.hex
 ${HUB_ELF}                  ${CURDIR}/../build/hub/zephyr/zephyr.elf
 # The same hub built with a signing master of its own, as a gateway the backend let pair but won't
-# sign for.
+# sign for; and with both masters of its own, as a stranger.
 ${HUB_OTHER_KEY_ELF}        ${CURDIR}/../build/hub-other-key/zephyr/zephyr.elf
+${HUB_STRANGER_ELF}         ${CURDIR}/../build/hub-stranger/zephyr/zephyr.elf
 ${SCRIPT}                   ${CURDIR}/oximeter.resc
 ${SIGNING_MASTER}           ${CURDIR}/../build/signing-master.key
 ${PAIRING_MASTER}           ${CURDIR}/../build/pairing-master.key
@@ -55,6 +56,13 @@ Pairs With The Hub Before Sending It Readings
     # with the pairing key it derives, which no one without the pairing master can.
     Wait For Line On Uart     paired with the oximeter at security level 4    testerId=${hub}    timeout=10
     Wait For Line On Uart     hub: (SpO2|no reading)    testerId=${hub}    treatAsRegex=true
+
+Can't Pair With A Hub Without The Pairing Master
+    Start System              ${HUB_STRANGER_ELF}
+    Start Emulation
+    # It can read the sealed pairing data but not open it, so it never pairs and hears nothing.
+    Wait For Line On Uart     couldn't open the oximeter's pairing data    testerId=${hub}    timeout=10
+    Should Not Be On Uart     hub: (SpO2|no reading)    testerId=${hub}    timeout=5    treatAsRegex=true
 
 Sends Readings To The Hub And Alarms On Limits It Signs
     Start System
