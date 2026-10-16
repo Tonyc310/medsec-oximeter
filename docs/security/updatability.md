@@ -47,10 +47,10 @@ sequenceDiagram
 | 1 | E-6 to E-5 | signed image | HTTPS, TLS 1.3 | the image's signature; the release pipeline authenticates to the server | planned |
 | 2 | E-5 to E-3 | signed image, version, security counter, target hardware | HTTPS, TLS 1.3 | server certificate; at home over the internet, on a ward the hospital's server fetches it | planned |
 | 3 | E-3 to E-2 | signed image | HTTPS, TLS 1.3, both sides authenticated by certificate (I-6) | the gateway only accepts updates from its own backend | planned |
-| 4 | E-2 to E-1 | signed image, upload and test commands | MCUmgr SMP over Bluetooth LE: service `8d53dc1d-1db7-4cd3-868b-8a527460aa84`, characteristic `da2e7828-fbce-4e01-ae9e-261174997c48` (I-8) | the SMP characteristic requires an encrypted, authenticated link. With pairing allowed only while a device is being set up (Phase 4), that means the bonded gateway | planned |
+| 4 | E-2 to E-1 | signed image, upload and test commands | MCUmgr SMP over Bluetooth LE: service `8d53dc1d-1db7-4cd3-868b-8a527460aa84`, characteristic `da2e7828-fbce-4e01-ae9e-261174997c48` (I-8) | the SMP characteristic requires an encrypted, authenticated link. Only a gateway the backend authorizes can pair: pairing needs the oximeter's sealed out-of-band data, which only the backend can open | planned |
 | 5 | slot 1 to slot 0 | the image | MCUboot, on the device | signature and security counter checked before the image is used | done |
 
-Hop 4 relies on the Bluetooth pairing and bonding that Phase 4 adds for the readings and the alarm limits. Zephyr's SMP transport already defaults to requiring an authenticated link once pairing is enabled (`CONFIG_MCUMGR_TRANSPORT_BT_PERM_RW_AUTHEN`). Without it, anyone in radio range could upload; the signature check would still stop them installing anything the manufacturer didn't sign.
+Hop 4 relies on the Bluetooth pairing that Phase 4 adds for the readings and the alarm limits, now built: LE Secure Connections only, at security level 4, authenticated with out-of-band data the oximeter seals under its pairing key (README, Bluetooth). Bonding is next. Zephyr's SMP transport already defaults to requiring an authenticated link once pairing is enabled (`CONFIG_MCUMGR_TRANSPORT_BT_PERM_RW_AUTHEN`). Without it, anyone in radio range could upload; the signature check would still stop them installing anything the manufacturer didn't sign.
 
 ## Verification on the oximeter
 
