@@ -1,6 +1,7 @@
 #ifndef MEDSEC_BT_H
 #define MEDSEC_BT_H
 
+#include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 
 /* The alarm service isn't a Bluetooth SIG standard, so its UUIDs are 128-bit: one random base,
@@ -13,5 +14,14 @@
 #define MEDSEC_ALARM_CHALLENGE_VAL MEDSEC_UUID(4) /* what a limits change is signed over: read */
 #define MEDSEC_SECURITY_LOG_VAL MEDSEC_UUID(5)    /* security event records, oldest first: read */
 #define MEDSEC_DEVICE_ID_VAL MEDSEC_UUID(6)       /* the ID its key is derived from: read */
+
+/* What the oximeter protects needs security level 4: authenticated (AUTHEN) LE Secure Connections
+ * (LESC). Either flag alone accepts less: LESC alone takes an unauthenticated Just Works pairing.
+ */
+#define MEDSEC_PERM_READ_L4 (BT_GATT_PERM_READ_AUTHEN | BT_GATT_PERM_READ_LESC)
+#define MEDSEC_PERM_WRITE_L4 (BT_GATT_PERM_WRITE_AUTHEN | BT_GATT_PERM_WRITE_LESC)
+
+#define MEDSEC_PAIRING_SERVICE_VAL MEDSEC_UUID(7)
+#define MEDSEC_SEALED_PAIRING_DATA_VAL MEDSEC_UUID(8) /* pairing_seal's, fresh each read: read */
 
 #endif

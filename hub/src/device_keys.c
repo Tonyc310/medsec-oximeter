@@ -8,8 +8,9 @@
 static const char *const labels[] = {
     [DEVICE_KEY_LIMITS] = "medsec limits key",
     [DEVICE_KEY_LOG] = "medsec log key",
+    [DEVICE_KEY_PAIRING] = "medsec pairing key",
 };
-#define LONGEST_LABEL (sizeof "medsec limits key" - 1u)
+#define LONGEST_LABEL (sizeof "medsec pairing key" - 1u)
 
 bool device_keys_hkdf(const uint8_t *ikm, size_t ikm_length, const uint8_t *salt,
                       size_t salt_length, const uint8_t *info, size_t info_length, uint8_t *out,

@@ -5,6 +5,7 @@
 #include "log_verifier.h"
 #include "masters.h"
 #include "medsec_bt.h"
+#include "pairing.h"
 #include "plx.h"
 #include "security_log.h"
 
@@ -34,6 +35,8 @@ static const struct bt_uuid_128 alarm_state = BT_UUID_INIT_128(MEDSEC_ALARM_STAT
 static const struct bt_uuid_128 alarm_challenge = BT_UUID_INIT_128(MEDSEC_ALARM_CHALLENGE_VAL);
 static const struct bt_uuid_128 security_log = BT_UUID_INIT_128(MEDSEC_SECURITY_LOG_VAL);
 static const struct bt_uuid_128 device_id = BT_UUID_INIT_128(MEDSEC_DEVICE_ID_VAL);
+static const struct bt_uuid_128 sealed_pairing_data =
+    BT_UUID_INIT_128(MEDSEC_SEALED_PAIRING_DATA_VAL);
 
 static struct bt_conn *oximeter;
 static struct bt_gatt_discover_params discover_params;
@@ -43,6 +46,7 @@ static uint16_t state_handle;
 static uint16_t challenge_handle;
 static uint16_t log_handle;
 static uint16_t device_id_handle;
+static uint16_t sealed_handle;
 static struct bt_gatt_read_params device_id_read;
 
 /* Each subscription finds its own CCC descriptor, so each needs its own discovery parameters. */
@@ -133,8 +137,8 @@ static void subscribe(struct bt_conn *conn, struct bt_gatt_subscribe_params *sub
 }
 
 /* Standing in for the backend, the hub derives the keys the factory gave this oximeter: one to sign
- * its limit changes, one to check its log. Only that device's keys are loaded; the signing
- * master stays with the hub. */
+ * its limit changes, one to check its log, one to open its pairing data. Only that device's keys
+ * are loaded; the masters stay with the hub. */
 static uint8_t on_device_id(struct bt_conn *conn, uint8_t err, struct bt_gatt_read_params *params,
                             const void *data, uint16_t length)
 {
@@ -158,13 +162,18 @@ static uint8_t on_device_id(struct bt_conn *conn, uint8_t err, struct bt_gatt_re
             device_keys_derive(signing_master, sizeof signing_master, DEVICE_KEY_LOG, id, key) &&
             log_verifier_init(key, sizeof key);
 
-    mbedtls_platform_zeroize(key, sizeof key);
     if (ready) {
         LOG_INF("signing for oximeter %02x%02x%02x%02x%02x%02x%02x%02x", id[0], id[1], id[2], id[3],
                 id[4], id[5], id[6], id[7]);
     } else {
         LOG_ERR("couldn't derive the oximeter's keys");
     }
+    if (device_keys_derive(pairing_master, sizeof pairing_master, DEVICE_KEY_PAIRING, id, key)) {
+        pairing_start(conn, sealed_handle, id, key);
+    } else {
+        LOG_ERR("couldn't derive the oximeter's pairing key");
+    }
+    mbedtls_platform_zeroize(key, sizeof key);
     return BT_GATT_ITER_STOP;
 }
 
@@ -182,22 +191,19 @@ static void read_device_id(struct bt_conn *conn)
     }
 }
 
-/* One pass over every characteristic, noting the six the hub uses; then subscribe, and learn the
- * oximeter's ID to sign for it. */
+/* One pass over every characteristic, noting the seven the hub uses; then learn the oximeter's ID,
+ * to pair with it and sign for it. */
 static uint8_t on_characteristic(struct bt_conn *conn, const struct bt_gatt_attr *attr,
                                  struct bt_gatt_discover_params *params)
 {
     ARG_UNUSED(params);
     if (attr == NULL) {
         if ((measurement_handle == 0u) || (limits_handle == 0u) || (state_handle == 0u) ||
-            (challenge_handle == 0u) || (log_handle == 0u) || (device_id_handle == 0u)) {
+            (challenge_handle == 0u) || (log_handle == 0u) || (device_id_handle == 0u) ||
+            (sealed_handle == 0u)) {
             LOG_WRN("not a pulse oximeter this hub knows");
             return BT_GATT_ITER_STOP;
         }
-        subscribe(conn, &measurement_subscription, &measurement_ccc_discovery, measurement_handle,
-                  on_measurement);
-        subscribe(conn, &alarm_subscription, &alarm_ccc_discovery, state_handle, on_alarm);
-        LOG_INF("subscribed to readings and alarms");
         read_device_id(conn);
         return BT_GATT_ITER_STOP;
     }
@@ -216,6 +222,8 @@ static uint8_t on_characteristic(struct bt_conn *conn, const struct bt_gatt_attr
         log_handle = characteristic->value_handle;
     } else if (bt_uuid_cmp(characteristic->uuid, &device_id.uuid) == 0) {
         device_id_handle = characteristic->value_handle;
+    } else if (bt_uuid_cmp(characteristic->uuid, &sealed_pairing_data.uuid) == 0) {
+        sealed_handle = characteristic->value_handle;
     }
     return BT_GATT_ITER_CONTINUE;
 }
@@ -235,7 +243,8 @@ static uint8_t on_challenge(struct bt_conn *conn, uint8_t err, struct bt_gatt_re
                             const void *data, uint16_t length)
 {
     ARG_UNUSED(params);
-    if (data == NULL) {
+    /* A failed read reports its error with no data; one that went through ends with no data. */
+    if ((data == NULL) && (err == 0u)) {
         return BT_GATT_ITER_STOP;
     }
     if ((err != 0u) || (length != LIMITS_AUTH_CHALLENGE_SIZE)) {
@@ -551,14 +560,33 @@ static void on_disconnected(struct bt_conn *conn, uint8_t reason)
     start_scan();
 }
 
+/* The oximeter sends readings and alarms only once paired, at level 4. */
+static void on_security_changed(struct bt_conn *conn, bt_security_t level, enum bt_security_err err)
+{
+    if ((err != BT_SECURITY_ERR_SUCCESS) || (level < BT_SECURITY_L4)) {
+        LOG_WRN("not paired with the oximeter (security level %d, error %d)", level, err);
+        return;
+    }
+    LOG_INF("paired with the oximeter at security level %d", level);
+    subscribe(conn, &measurement_subscription, &measurement_ccc_discovery, measurement_handle,
+              on_measurement);
+    subscribe(conn, &alarm_subscription, &alarm_ccc_discovery, state_handle, on_alarm);
+    LOG_INF("subscribed to readings and alarms");
+}
+
 BT_CONN_CB_DEFINE(connection_callbacks) = {
     .connected = on_connected,
     .disconnected = on_disconnected,
+    .security_changed = on_security_changed,
 };
 
 int main(void)
 {
     LOG_INF("hub started");
+    if (pairing_init() != 0) {
+        LOG_ERR("could not set up pairing");
+        return 0;
+    }
     if (bt_enable(NULL) != 0) {
         LOG_ERR("could not start Bluetooth");
         return 0;

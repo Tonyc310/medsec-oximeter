@@ -1,0 +1,6 @@
+// The hub's nRF52840 DK, with the CCM that Renode doesn't model: Ccm.cs adds it, so the hub can
+// pair and encrypt.
+using "platforms/boards/nrf52840dk_nrf52840.repl"
+
+ccm: Miscellaneous.NRF52840_CCM @ sysbus 0x4000F000
+    IRQ -> nvic@15

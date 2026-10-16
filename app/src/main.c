@@ -3,6 +3,8 @@
 #include "event_log.h"
 #include "log_mac.h"
 #include "oximetry.h"
+#include "pairing.h"
+#include "pairing_seal.h"
 #include "plx_service.h"
 #include "supervisor.h"
 
@@ -105,14 +107,14 @@ static void log_start(void)
             version->revision, version->build_num);
 }
 
-/* Before the log starts, so even the start-up record is tagged. Without a key, records are still
- * kept, with tags that verify against nothing. */
-static void load_log_key(void)
+/* A key from UICR into the module that uses it, wiping the copy here. */
+static void load_key(device_key_purpose_t purpose, bool (*init)(const uint8_t *key, size_t length),
+                     const char *name)
 {
     uint8_t key[DEVICE_KEY_SIZE];
 
-    if (device_identity_key(DEVICE_KEY_LOG, key) && !log_mac_init(key, sizeof key)) {
-        LOG_ERR("could not load the log key");
+    if (device_identity_key(purpose, key) && !init(key, sizeof key)) {
+        LOG_ERR("could not load the %s key", name);
     }
     mbedtls_platform_zeroize(key, sizeof key);
 }
@@ -125,7 +127,11 @@ int main(void)
     };
 
     log_start();
-    load_log_key();
+    /* Before the log starts, so even the start-up record is tagged. Without a key, records are
+     * still kept, with tags that verify against nothing; without a pairing key, nothing can
+     * pair. */
+    load_key(DEVICE_KEY_LOG, log_mac_init, "log");
+    load_key(DEVICE_KEY_PAIRING, pairing_seal_init, "pairing");
     /* Monitoring goes on without the log if it can't start. */
     if (event_log_start() != 0) {
         LOG_ERR("security event log unavailable");
@@ -133,6 +139,10 @@ int main(void)
     oximetry_init(&oximetry);
     if (alarm_service_init() != 0) {
         LOG_ERR("could not set up the alarm LED");
+        return 0;
+    }
+    if (pairing_init() != 0) {
+        LOG_ERR("could not set up pairing");
         return 0;
     }
     if (plx_service_start() != 0) {

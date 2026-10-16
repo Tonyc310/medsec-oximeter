@@ -4,10 +4,12 @@ Library                     Process
 *** Variables ***
 ${OXIMETER_IMAGE}           ${CURDIR}/../build/oximeter/app/zephyr/zephyr.signed.hex
 ${HUB_ELF}                  ${CURDIR}/../build/hub/zephyr/zephyr.elf
-# The same hub built with a master of its own, as a gateway that can't make this oximeter's key.
+# The same hub built with a signing master of its own, as a gateway the backend let pair but won't
+# sign for.
 ${HUB_OTHER_KEY_ELF}        ${CURDIR}/../build/hub-other-key/zephyr/zephyr.elf
 ${SCRIPT}                   ${CURDIR}/oximeter.resc
 ${SIGNING_MASTER}           ${CURDIR}/../build/signing-master.key
+${PAIRING_MASTER}           ${CURDIR}/../build/pairing-master.key
 # The simulated oximeter's ID: the FICR DEVICEID values in nrf52840dk-oximeter.repl.
 ${DEVICE_ID}                0123456789abcdef
 ${PROVISIONED}              ${CURDIR}/../build/renode/provision.resc
@@ -19,9 +21,10 @@ ${ALARM_LED}                sysbus.gpio0.led0
 *** Keywords ***
 Start System
     [Arguments]               ${hub_elf}=${HUB_ELF}    ${provisioning}=${PROVISIONED}
-    # The factory derives the oximeter's keys from the signing master and its ID, as the hub does.
+    # The factory derives the oximeter's keys from the masters and its ID, as the hub does.
     ${result}=                Run Process    python3    ${CURDIR}/../tools/provision.py
-    ...                       --signing-master    ${SIGNING_MASTER}    --device-id    ${DEVICE_ID}    --renode    ${PROVISIONED}
+    ...                       --signing-master    ${SIGNING_MASTER}    --pairing-master    ${PAIRING_MASTER}
+    ...                       --device-id    ${DEVICE_ID}    --renode    ${PROVISIONED}
     Should Be Equal As Integers    ${result.rc}    0    ${result.stderr}
     Execute Command           $oximeter_image=@${OXIMETER_IMAGE}
     Execute Command           $hub_bin=@${hub_elf}
@@ -45,6 +48,14 @@ Monitor A Patient At 94 Percent
     Assert LED State          false
 
 *** Test Cases ***
+Pairs With The Hub Before Sending It Readings
+    Start System
+    Start Emulation
+    # Authenticated LE Secure Connections: the hub opened the oximeter's sealed out-of-band data
+    # with the pairing key it derives, which no one without the pairing master can.
+    Wait For Line On Uart     paired with the oximeter at security level 4    testerId=${hub}    timeout=10
+    Wait For Line On Uart     hub: (SpO2|no reading)    testerId=${hub}    treatAsRegex=true
+
 Sends Readings To The Hub And Alarms On Limits It Signs
     Start System
     Monitor A Patient At 94 Percent
@@ -129,14 +140,16 @@ Logs A Refused Change From A Hub Without Its Key
     Write Line To Uart        log    testerId=${hub}
     Wait For Line On Uart     \#3 boot 1 \\+[0-9.]+ s: limits refused: tag doesn't match    testerId=${hub}    treatAsRegex=true
 
-Refuses Every Change Without A Device Key
+Can't Be Paired Or Changed Without A Device Key
     Start System              provisioning=${UNPROVISIONED}
-    Monitor A Patient At 94 Percent
+    ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
+    Start Emulation
+    Wait For Line On Uart     no device key provisioned    testerId=${oximeter}
+    # Without a pairing key it can't seal its pairing data, so no hub can pair with it, and nothing
+    # it protects can be read or changed.
+    Wait For Line On Uart     couldn't read the oximeter's pairing data    testerId=${hub}
     Write Line To Uart        limits 95 50 120    testerId=${hub}
-    Wait For Line On Uart     oximeter rejected the alarm limits (ATT error 0x13)    testerId=${hub}
-    Write Line To Uart        log    testerId=${hub}
-    Wait For Line On Uart     \#2 boot 1 \\+[0-9.]+ s: no device key provisioned    testerId=${hub}    treatAsRegex=true
-    Assert LED State          false
+    Wait For Line On Uart     couldn't read the oximeter's challenge    testerId=${hub}
 
 Verifies Every Record Of The Log
     Start System

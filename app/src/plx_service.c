@@ -1,5 +1,6 @@
 #include "plx_service.h"
 
+#include "medsec_bt.h"
 #include "plx.h"
 
 #include <errno.h>
@@ -20,13 +21,14 @@ static ssize_t read_features(struct bt_conn *conn, const struct bt_gatt_attr *at
     return bt_gatt_attr_read(conn, attr, buf, len, offset, features, sizeof features);
 }
 
-/* Open in the baseline: anyone in range can connect and listen (threats T-07, T-08). */
+/* Only a central paired at level 4, authenticated LE Secure Connections, can subscribe, so only
+ * the gateway hears the patient's readings (threats T-07, T-08). */
 BT_GATT_SERVICE_DEFINE(pulse_oximeter_service, BT_GATT_PRIMARY_SERVICE(BT_UUID_POS),
                        BT_GATT_CHARACTERISTIC(BT_UUID_GATT_PLX_CM, BT_GATT_CHRC_NOTIFY,
                                               BT_GATT_PERM_NONE, NULL, NULL, NULL),
-                       BT_GATT_CCC(NULL, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+                       BT_GATT_CCC(NULL, BT_GATT_PERM_READ | MEDSEC_PERM_WRITE_L4),
                        BT_GATT_CHARACTERISTIC(BT_UUID_GATT_PLX_F, BT_GATT_CHRC_READ,
-                                              BT_GATT_PERM_READ, read_features, NULL, NULL));
+                                              MEDSEC_PERM_READ_L4, read_features, NULL, NULL));
 
 /* attrs[0] declares the service; attrs[1] is the Continuous Measurement characteristic. */
 #define CONTINUOUS_MEASUREMENT (&pulse_oximeter_service.attrs[1])

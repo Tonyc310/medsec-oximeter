@@ -75,8 +75,9 @@ jobs:
           west build -b native_sim/native/64 -d build/pairing_seal common/tests/pairing_seal
           build/pairing_seal/zephyr/zephyr.exe
 
-      # The second hub has a master of its own, for the test that a stranger's change is refused.
-      # Zephyr's flash driver tests, on the internal flash, check the flash controller model.
+      # The second hub has a signing master of its own, a gateway the backend let pair but won't
+      # sign for. Zephyr's flash driver tests, on the internal flash, check the flash controller
+      # model.
       - name: Build the firmware
         run: |
           west build --sysbuild -b nrf52840dk/nrf52840 -d build/oximeter app

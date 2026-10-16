@@ -131,21 +131,24 @@ static ssize_t read_device_id(struct bt_conn *conn, const struct bt_gatt_attr *a
     return bt_gatt_attr_read(conn, attr, buf, len, offset, id, sizeof id);
 }
 
-/* Anyone in range can read the limits, but only a holder of the limits key can change them, and
- * only once per challenge (threats T-01 to T-03). */
-BT_GATT_SERVICE_DEFINE(
-    alarm_service, BT_GATT_PRIMARY_SERVICE(&service_uuid),
-    BT_GATT_CHARACTERISTIC(&limits_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,
-                           BT_GATT_PERM_READ | BT_GATT_PERM_WRITE, read_limits, write_limits, NULL),
-    BT_GATT_CHARACTERISTIC(&state_uuid.uuid, BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
-                           BT_GATT_PERM_READ, read_state, NULL, NULL),
-    BT_GATT_CCC(NULL, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-    BT_GATT_CHARACTERISTIC(&challenge_uuid.uuid, BT_GATT_CHRC_READ, BT_GATT_PERM_READ,
-                           read_challenge, NULL, NULL),
-    BT_GATT_CHARACTERISTIC(&log_uuid.uuid, BT_GATT_CHRC_READ, BT_GATT_PERM_READ, read_log, NULL,
-                           NULL),
-    BT_GATT_CHARACTERISTIC(&device_id_uuid.uuid, BT_GATT_CHRC_READ, BT_GATT_PERM_READ,
-                           read_device_id, NULL, NULL));
+/* Only a central paired at level 4 reaches the limits, the alarms and the log; even then only a
+ * holder of the limits key can change the limits, and only once per challenge (threats T-01 to
+ * T-03). The device ID stays open: a central needs it to pair. */
+BT_GATT_SERVICE_DEFINE(alarm_service, BT_GATT_PRIMARY_SERVICE(&service_uuid),
+                       BT_GATT_CHARACTERISTIC(&limits_uuid.uuid,
+                                              BT_GATT_CHRC_READ | BT_GATT_CHRC_WRITE,
+                                              MEDSEC_PERM_READ_L4 | MEDSEC_PERM_WRITE_L4,
+                                              read_limits, write_limits, NULL),
+                       BT_GATT_CHARACTERISTIC(&state_uuid.uuid,
+                                              BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
+                                              MEDSEC_PERM_READ_L4, read_state, NULL, NULL),
+                       BT_GATT_CCC(NULL, BT_GATT_PERM_READ | MEDSEC_PERM_WRITE_L4),
+                       BT_GATT_CHARACTERISTIC(&challenge_uuid.uuid, BT_GATT_CHRC_READ,
+                                              MEDSEC_PERM_READ_L4, read_challenge, NULL, NULL),
+                       BT_GATT_CHARACTERISTIC(&log_uuid.uuid, BT_GATT_CHRC_READ,
+                                              MEDSEC_PERM_READ_L4, read_log, NULL, NULL),
+                       BT_GATT_CHARACTERISTIC(&device_id_uuid.uuid, BT_GATT_CHRC_READ,
+                                              BT_GATT_PERM_READ, read_device_id, NULL, NULL));
 
 static void on_connected(struct bt_conn *conn, uint8_t err)
 {

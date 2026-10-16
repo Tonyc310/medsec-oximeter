@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Provision an oximeter's keys, as the factory would.
 
-Derives the device's limits key and log key from the backend's signing master and the device ID
-the way the backend does, with HKDF-SHA256 (RFC 5869), and gives the UICR words to write: as a
-list, or as a Renode script that writes them into the simulated oximeter.
+Derives the device's keys from the backend's masters and the device ID the way the backend does,
+with HKDF-SHA256 (RFC 5869): the limits key and log key from the signing master, the pairing key
+from the pairing master. Gives the UICR words to write: as a list, or as a Renode script that
+writes them into the simulated oximeter.
 """
 
 import argparse
@@ -14,7 +15,8 @@ from pathlib import Path
 
 # Must match hub/src/device_keys.c and app/src/device_identity.c: one label per key, and the keys
 # in this order in UICR.
-LABELS = (b"medsec limits key", b"medsec log key")
+SIGNING_LABELS = (b"medsec limits key", b"medsec log key")
+PAIRING_LABEL = b"medsec pairing key"
 KEY_SIZE = 32
 DEVICE_ID_SIZE = 8
 UICR_CUSTOMER = 0x10001080
@@ -33,9 +35,13 @@ def hkdf_sha256(ikm: bytes, salt: bytes, info: bytes, length: int) -> bytes:
     return okm[:length]
 
 
-def device_keys(master: bytes, device_id: bytes) -> bytes:
+def device_keys(signing_master: bytes, pairing_master: bytes, device_id: bytes) -> bytes:
     """The keys of the oximeter with `device_id`, one after the other, as UICR holds them."""
-    return b"".join(hkdf_sha256(master, b"", label + device_id, KEY_SIZE) for label in LABELS)
+    keys = [
+        hkdf_sha256(signing_master, b"", label + device_id, KEY_SIZE) for label in SIGNING_LABELS
+    ]
+    keys.append(hkdf_sha256(pairing_master, b"", PAIRING_LABEL + device_id, KEY_SIZE))
+    return b"".join(keys)
 
 
 def uicr_words(keys: bytes) -> list[tuple[int, int]]:
@@ -61,13 +67,17 @@ def main() -> None:
     parser.add_argument(
         "--signing-master", type=Path, required=True, help="file holding the signing master, hex"
     )
+    parser.add_argument(
+        "--pairing-master", type=Path, required=True, help="file holding the pairing master, hex"
+    )
     parser.add_argument("--device-id", required=True, help="the device's ID, 16 hex digits")
     parser.add_argument("--renode", type=Path, help="write a Renode script here instead of a list")
     args = parser.parse_args()
 
-    master = read_hex(args.signing_master.read_text(), KEY_SIZE, str(args.signing_master))
+    signing_master = read_hex(args.signing_master.read_text(), KEY_SIZE, str(args.signing_master))
+    pairing_master = read_hex(args.pairing_master.read_text(), KEY_SIZE, str(args.pairing_master))
     device_id = read_hex(args.device_id, DEVICE_ID_SIZE, "the device ID")
-    words = uicr_words(device_keys(master, device_id))
+    words = uicr_words(device_keys(signing_master, pairing_master, device_id))
 
     if args.renode is None:
         for address, value in words:
