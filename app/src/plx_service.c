@@ -9,6 +9,7 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/settings/settings.h>
 
 LOG_MODULE_REGISTER(plx_service, LOG_LEVEL_INF);
 
@@ -87,6 +88,13 @@ int plx_service_start(void)
 
     if (err != 0) {
         return err;
+    }
+    /* The bond with the gateway, kept in flash through a reset. Without it the gateway pairs
+     * again, so monitoring goes on either way. */
+    const int load_err = settings_load_subtree("bt");
+
+    if (load_err != 0) {
+        LOG_ERR("could not load the bond: %d", load_err);
     }
     advertise();
     return 0;

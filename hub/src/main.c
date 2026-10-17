@@ -567,7 +567,7 @@ static void on_security_changed(struct bt_conn *conn, bt_security_t level, enum 
         LOG_WRN("not paired with the oximeter (security level %d, error %d)", level, err);
         return;
     }
-    LOG_INF("paired with the oximeter at security level %d", level);
+    LOG_INF("link to the oximeter at security level %d", level);
     subscribe(conn, &measurement_subscription, &measurement_ccc_discovery, measurement_handle,
               on_measurement);
     subscribe(conn, &alarm_subscription, &alarm_ccc_discovery, state_handle, on_alarm);

@@ -54,6 +54,16 @@ static uint8_t on_sealed(struct bt_conn *conn, uint8_t err, struct bt_gatt_read_
 void pairing_start(struct bt_conn *conn, uint16_t sealed_handle,
                    const uint8_t device_id[DEVICE_ID_SIZE], const uint8_t key[DEVICE_KEY_SIZE])
 {
+    if (bt_le_bond_exists(BT_ID_DEFAULT, bt_conn_get_dst(conn))) {
+        LOG_INF("using the oximeter's bond");
+
+        const int err = bt_conn_set_security(conn, BT_SECURITY_L4);
+
+        if (err != 0) {
+            LOG_ERR("encrypting with the bond didn't start: %d", err);
+        }
+        return;
+    }
     if (!pairing_open_init(key, DEVICE_KEY_SIZE)) {
         LOG_ERR("couldn't load the oximeter's pairing key");
         return;
@@ -93,6 +103,7 @@ static void on_pairing_complete(struct bt_conn *conn, bool bonded)
     ARG_UNUSED(conn);
     ARG_UNUSED(bonded);
     mbedtls_platform_zeroize(&oximeter_oob, sizeof oximeter_oob);
+    LOG_INF("paired with the oximeter");
 }
 
 static void on_pairing_failed(struct bt_conn *conn, enum bt_security_err reason)

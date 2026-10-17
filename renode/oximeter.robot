@@ -57,8 +57,23 @@ Pairs With The Hub Before Sending It Readings
     Start Emulation
     # Authenticated LE Secure Connections: the hub opened the oximeter's sealed out-of-band data
     # with the pairing key it derives, which no one without the pairing master can.
-    Wait For Line On Uart     paired with the oximeter at security level 4    testerId=${hub}    timeout=10
+    Wait For Line On Uart     pairing: paired with the oximeter    testerId=${hub}    timeout=10
+    Wait For Line On Uart     link to the oximeter at security level 4    testerId=${hub}
     Wait For Line On Uart     hub: (SpO2|no reading)    testerId=${hub}    treatAsRegex=true
+
+Keeps Its Pairing Through A Reset
+    Start System
+    ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
+    Monitor A Patient At 94 Percent
+    Wait For Line On Uart     pairing: paired    testerId=${oximeter}
+    Execute Command           mach set "oximeter"
+    Execute Command           machine Reset
+    Wait For Line On Uart     medsec-oximeter 1.0.0+0 started    testerId=${oximeter}
+    # Both kept the bond, so the hub reconnects at level 4 with the stored key, without pairing
+    # again: the oximeter never says it paired.
+    Wait For Line On Uart     link to the oximeter at security level 4    testerId=${hub}    timeout=10
+    Should Not Be On Uart     pairing: paired    testerId=${oximeter}    timeout=1
+    Wait For Line On Uart     hub: SpO2 94%    testerId=${hub}
 
 Can't Pair With A Hub Without The Pairing Master
     Start System              ${HUB_STRANGER_ELF}
