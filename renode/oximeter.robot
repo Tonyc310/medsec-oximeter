@@ -75,6 +75,31 @@ Keeps Its Pairing Through A Reset
     Should Not Be On Uart     pairing: paired    testerId=${oximeter}    timeout=1
     Wait For Line On Uart     hub: SpO2 94%    testerId=${hub}
 
+Lets A New Gateway's Pairing Replace The Old One
+    Start System
+    Monitor A Patient At 94 Percent
+    # The first hub goes out of range, and a second, with an address of its own, sets the oximeter
+    # up: the backend authorizes it, as it would a replacement gateway.
+    Execute Command           pause
+    Execute Command           mach set "hub"
+    Execute Command           connector Disconnect sysbus.radio wireless
+    Execute Command           mach create "second hub"
+    Execute Command           machine LoadPlatformDescription @${CURDIR}/nrf52840dk-hub.repl
+    Execute Command           sysbus Tag <0x100000a4, 0x100000a7> "DEVICEADDR[0]" 0x11223344
+    Execute Command           connector Connect sysbus.radio wireless
+    Execute Command           sysbus LoadELF @${HUB_ELF}
+    ${second_hub}=            Create Terminal Tester    ${UART}    machine=second hub
+    Execute Command           start
+    Wait For Line On Uart     pairing: paired with the oximeter    testerId=${second_hub}    timeout=15
+    Wait For Line On Uart     link to the oximeter at security level 4    testerId=${second_hub}
+    # Back in range, the first hub tries its old bond, which the oximeter no longer has.
+    Execute Command           mach set "second hub"
+    Execute Command           connector Disconnect sysbus.radio wireless
+    Execute Command           mach set "hub"
+    Execute Command           connector Connect sysbus.radio wireless
+    Wait For Line On Uart     using the oximeter's bond    testerId=${hub}    timeout=15
+    Wait For Line On Uart     not paired with the oximeter    testerId=${hub}    timeout=10
+
 Can't Pair With A Hub Without The Pairing Master
     Start System              ${HUB_STRANGER_ELF}
     Start Emulation
