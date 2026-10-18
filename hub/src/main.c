@@ -349,10 +349,45 @@ static const char *refusal(uint8_t reason)
     }
 }
 
+/* Why the oximeter refused a pairing: Zephyr's bt_security_err, from the oximeter's side. */
+static const char *pairing_refusal(uint8_t reason)
+{
+    switch (reason) {
+    case BT_SECURITY_ERR_AUTH_FAIL:
+        return "authentication failed";
+    case BT_SECURITY_ERR_PIN_OR_KEY_MISSING:
+        return "key missing";
+    case BT_SECURITY_ERR_OOB_NOT_AVAILABLE:
+        return "no out-of-band data";
+    case BT_SECURITY_ERR_AUTH_REQUIREMENT:
+        return "authentication requirements";
+    case BT_SECURITY_ERR_PAIR_NOT_SUPPORTED:
+        return "pairing not supported";
+    case BT_SECURITY_ERR_PAIR_NOT_ALLOWED:
+        return "pairing not allowed";
+    case BT_SECURITY_ERR_INVALID_PARAM:
+        return "invalid parameters";
+    case BT_SECURITY_ERR_KEY_REJECTED:
+        return "key rejected";
+    default:
+        return "unspecified";
+    }
+}
+
+/* A central as the oximeter records it: its address type, then its address, least significant
+ * byte first. */
+static void describe_central(const uint8_t *detail, char *text, size_t size)
+{
+    (void)snprintf(text, size, "%02X:%02X:%02X:%02X:%02X:%02X (%s)", detail[6], detail[5],
+                   detail[4], detail[3], detail[2], detail[1],
+                   (detail[0] == BT_ADDR_LE_PUBLIC) ? "public" : "random");
+}
+
 static void describe(const security_record_t *record, char *text, size_t size)
 {
     const uint8_t *detail = record->detail;
     alarm_limits_t limits;
+    char central[32];
 
     switch (record->event) {
     case SECURITY_EVENT_START:
@@ -360,9 +395,8 @@ static void describe(const security_record_t *record, char *text, size_t size)
                        (unsigned int)sys_get_le32(detail));
         break;
     case SECURITY_EVENT_CONNECTED:
-        (void)snprintf(text, size, "connected: %02X:%02X:%02X:%02X:%02X:%02X (%s)", detail[6],
-                       detail[5], detail[4], detail[3], detail[2], detail[1],
-                       (detail[0] == BT_ADDR_LE_PUBLIC) ? "public" : "random");
+        describe_central(detail, central, sizeof central);
+        (void)snprintf(text, size, "connected: %s", central);
         break;
     case SECURITY_EVENT_DISCONNECTED:
         (void)snprintf(text, size, "disconnected (reason 0x%02x)", detail[0]);
@@ -390,6 +424,14 @@ static void describe(const security_record_t *record, char *text, size_t size)
         break;
     case SECURITY_EVENT_NO_DEVICE_KEY:
         (void)snprintf(text, size, "no device key provisioned");
+        break;
+    case SECURITY_EVENT_PAIRED:
+        describe_central(detail, central, sizeof central);
+        (void)snprintf(text, size, "paired: %s", central);
+        break;
+    case SECURITY_EVENT_PAIRING_REFUSED:
+        describe_central(&detail[1], central, sizeof central);
+        (void)snprintf(text, size, "pairing refused: %s: %s", pairing_refusal(detail[0]), central);
         break;
     default:
         (void)snprintf(text, size, "unknown event %u", record->event);

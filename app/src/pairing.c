@@ -1,10 +1,12 @@
 #include "pairing.h"
 
 #include "device_identity.h"
+#include "event_log.h"
 #include "medsec_bt.h"
 #include "pairing_seal.h"
 
 #include <mbedtls/platform_util.h>
+#include <string.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
@@ -63,19 +65,38 @@ static void forget_oob(void)
     oob_ready = false;
 }
 
+/* The security log names the central as the CONNECTED record does: its address type, then its
+ * address. A refusal puts Zephyr's reason first. */
+static void record(security_event_t event, const uint8_t *reason, struct bt_conn *conn)
+{
+    const bt_addr_le_t *central = bt_conn_get_dst(conn);
+    uint8_t detail[2u + sizeof central->a.val];
+    size_t length = 0u;
+
+    if (reason != NULL) {
+        detail[length++] = *reason;
+    }
+    detail[length++] = central->type;
+    (void)memcpy(&detail[length], central->a.val, sizeof central->a.val);
+    length += sizeof central->a.val;
+    (void)event_log_record(event, detail, length);
+}
+
 static void on_pairing_complete(struct bt_conn *conn, bool bonded)
 {
-    ARG_UNUSED(conn);
     ARG_UNUSED(bonded);
     forget_oob();
     LOG_INF("paired");
+    record(SECURITY_EVENT_PAIRED, NULL, conn);
 }
 
 static void on_pairing_failed(struct bt_conn *conn, enum bt_security_err reason)
 {
-    ARG_UNUSED(conn);
+    const uint8_t code = (uint8_t)reason;
+
     forget_oob();
     LOG_WRN("pairing failed (reason %d)", reason);
+    record(SECURITY_EVENT_PAIRING_REFUSED, &code, conn);
 }
 
 static struct bt_conn_auth_cb auth_callbacks = {

@@ -89,7 +89,7 @@ static void test_ignores_malformed_records_found_in_flash(void)
     } cases[] = {
         {"too short", SECURITY_LOG_RECORD_SIZE - 1u, 50u, SECURITY_EVENT_START},
         {"too long", SECURITY_LOG_RECORD_SIZE + 1u, 50u, SECURITY_EVENT_START},
-        {"unknown event", SECURITY_LOG_RECORD_SIZE, 50u, 10u},
+        {"unknown event", SECURITY_LOG_RECORD_SIZE, 50u, (uint8_t)(SECURITY_EVENT_LAST + 1u)},
         {"no event", SECURITY_LOG_RECORD_SIZE, 50u, 0u},
         {"numbered 0", SECURITY_LOG_RECORD_SIZE, 0u, SECURITY_EVENT_START},
     };
@@ -134,11 +134,11 @@ static void test_decodes_a_record_back_to_its_fields(void)
 /* The newest event code is a known one. */
 static void test_restores_a_record_of_the_newest_event(void)
 {
-    const security_record_t newest = {.sequence = 4u, .event = SECURITY_EVENT_NO_DEVICE_KEY};
+    const security_record_t newest = {.sequence = 4u, .event = SECURITY_EVENT_PAIRING_REFUSED};
     uint8_t stored[SECURITY_LOG_RECORD_SIZE];
     security_record_t record = {0};
 
-    TEST_ASSERT_EQUAL_UINT8(9u, SECURITY_EVENT_NO_DEVICE_KEY);
+    TEST_ASSERT_EQUAL_UINT8(11u, SECURITY_EVENT_PAIRING_REFUSED);
     security_log_encode(&newest, stored);
     security_log_restore(&security, stored, sizeof stored);
     (void)security_log_next(&security, &record);

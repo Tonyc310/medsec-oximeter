@@ -203,7 +203,13 @@ Logs The Security Events The Hub Reads
     Write Line To Uart        log    testerId=${hub}
     Wait For Line On Uart     \#1 boot 1 \\+[0-9.]+ s: started    testerId=${hub}    treatAsRegex=true
     Wait For Line On Uart     \#2 boot 1 \\+[0-9.]+ s: connected: C0:00:AA:BB:CC:DD \\(random\\)    testerId=${hub}    treatAsRegex=true
-    Wait For Line On Uart     \#3 boot 1 \\+[0-9.]+ s: limits accepted: SpO2 below 95%, pulse below 50 or above 120 bpm    testerId=${hub}    treatAsRegex=true
+    Wait For Line On Uart     \#4 boot 1 \\+[0-9.]+ s: limits accepted: SpO2 below 95%, pulse below 50 or above 120 bpm    testerId=${hub}    treatAsRegex=true
+
+Logs The Pairing
+    Start System
+    Monitor A Patient At 94 Percent
+    Write Line To Uart        log    testerId=${hub}
+    Wait For Line On Uart     \#3 boot 1 \\+[0-9.]+ s: paired: C0:00:AA:BB:CC:DD \\(random\\)    testerId=${hub}    treatAsRegex=true
 
 Logs A Refused Change From A Hub Without Its Key
     Start System              ${HUB_OTHER_KEY_ELF}
@@ -213,7 +219,7 @@ Logs A Refused Change From A Hub Without Its Key
 
     # Anyone in range can read the log until pairing, the stranger included.
     Write Line To Uart        log    testerId=${hub}
-    Wait For Line On Uart     \#3 boot 1 \\+[0-9.]+ s: limits refused: tag doesn't match    testerId=${hub}    treatAsRegex=true
+    Wait For Line On Uart     \#4 boot 1 \\+[0-9.]+ s: limits refused: tag doesn't match    testerId=${hub}    treatAsRegex=true
 
 Can't Be Paired Or Changed Without A Device Key
     Start System              provisioning=${UNPROVISIONED}
@@ -234,7 +240,7 @@ Verifies Every Record Of The Log
 
     # Each record carries a MAC under the oximeter's log key, which the backend can derive.
     Write Line To Uart        log    testerId=${hub}
-    Wait For Line On Uart     3 security records, 3 verified    testerId=${hub}
+    Wait For Line On Uart     4 security records, 4 verified    testerId=${hub}
 
 Can't Verify The Log Without The Signing Master
     Start System              ${HUB_OTHER_KEY_ELF}
