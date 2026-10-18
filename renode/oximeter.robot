@@ -211,6 +211,27 @@ Logs The Pairing
     Write Line To Uart        log    testerId=${hub}
     Wait For Line On Uart     \#3 boot 1 \\+[0-9.]+ s: paired: C0:00:AA:BB:CC:DD \\(random\\)    testerId=${hub}    treatAsRegex=true
 
+Logs A Refused Pairing
+    Start System              ${PHONE_ELF}
+    Start Emulation
+    Wait For Line On Uart     to initialize the stack    testerId=${hub}
+    Write Line To Uart        bt init    testerId=${hub}
+    Wait For Line On Uart     Bluetooth initialized    testerId=${hub}
+    Write Line To Uart        bt connect-name medsec-oximeter    testerId=${hub}
+    Wait For Line On Uart     Connected:    testerId=${hub}    timeout=10
+    Write Line To Uart        bt security 2    testerId=${hub}
+    Wait For Line On Uart     Security failed:    testerId=${hub}    timeout=10
+    # The hub takes the phone's place, pairs and reads the log.
+    Execute Command           pause
+    Execute Command           mach set "hub"
+    Execute Command           sysbus LoadELF @${HUB_ELF}
+    Execute Command           machine Reset
+    Execute Command           start
+    Wait For Line On Uart     link to the oximeter at security level 4    testerId=${hub}    timeout=20
+    Write Line To Uart        log    testerId=${hub}
+    # The phone connects from a private address of its own.
+    Wait For Line On Uart     pairing refused: authentication requirements: [0-9A-F:]{17} \\(random\\)    testerId=${hub}    treatAsRegex=true
+
 Logs A Refused Change From A Hub Without Its Key
     Start System              ${HUB_OTHER_KEY_ELF}
     Monitor A Patient At 94 Percent
