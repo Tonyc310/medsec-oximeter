@@ -1,0 +1,10 @@
+# The hub's own options, then Zephyr's.
+
+config HUB_SMP_CLIENT_TRANSPORT
+	bool "SMP over the hub's link to the oximeter"
+	default y
+	select MCUMGR_TRANSPORT_REASSEMBLY
+	help
+	  src/update.c's SMP transport, which reassembles responses longer than one notification.
+
+source "Kconfig.zephyr"

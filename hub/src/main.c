@@ -8,6 +8,7 @@
 #include "pairing.h"
 #include "plx.h"
 #include "security_log.h"
+#include "update.h"
 
 #include <errno.h>
 #include <mbedtls/platform_util.h>
@@ -18,6 +19,7 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/mgmt/mcumgr/transport/smp_bt.h>
 #include <zephyr/shell/shell.h>
 #include <zephyr/shell/shell_string_conv.h>
 #include <zephyr/sys/byteorder.h>
@@ -37,6 +39,7 @@ static const struct bt_uuid_128 security_log = BT_UUID_INIT_128(MEDSEC_SECURITY_
 static const struct bt_uuid_128 device_id = BT_UUID_INIT_128(MEDSEC_DEVICE_ID_VAL);
 static const struct bt_uuid_128 sealed_pairing_data =
     BT_UUID_INIT_128(MEDSEC_SEALED_PAIRING_DATA_VAL);
+static const struct bt_uuid_128 smp = BT_UUID_INIT_128(SMP_BT_CHR_UUID_VAL);
 
 static struct bt_conn *oximeter;
 static struct bt_gatt_discover_params discover_params;
@@ -224,6 +227,8 @@ static uint8_t on_characteristic(struct bt_conn *conn, const struct bt_gatt_attr
         device_id_handle = characteristic->value_handle;
     } else if (bt_uuid_cmp(characteristic->uuid, &sealed_pairing_data.uuid) == 0) {
         sealed_handle = characteristic->value_handle;
+    } else if (bt_uuid_cmp(characteristic->uuid, &smp.uuid) == 0) {
+        update_found(conn, characteristic->value_handle);
     }
     return BT_GATT_ITER_CONTINUE;
 }
@@ -614,6 +619,7 @@ static void on_security_changed(struct bt_conn *conn, bt_security_t level, enum 
               on_measurement);
     subscribe(conn, &alarm_subscription, &alarm_ccc_discovery, state_handle, on_alarm);
     LOG_INF("subscribed to readings and alarms");
+    update_link_secured(conn);
 }
 
 BT_CONN_CB_DEFINE(connection_callbacks) = {
@@ -627,6 +633,10 @@ int main(void)
     LOG_INF("hub started");
     if (pairing_init() != 0) {
         LOG_ERR("could not set up pairing");
+        return 0;
+    }
+    if (update_init() != 0) {
+        LOG_ERR("could not set up updates");
         return 0;
     }
     if (bt_enable(NULL) != 0) {

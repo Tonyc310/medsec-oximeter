@@ -19,3 +19,4 @@ manifest:
           # Mbed TLS and TF-PSA-Crypto, which provides the PSA Crypto API.
           - mbedtls
           - tf-psa-crypto
+          - zcbor       # CBOR, for MCUmgr's update protocol

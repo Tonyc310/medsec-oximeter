@@ -30,3 +30,9 @@ Sign An Update
     Sign                      ${RELEASE_KEY}    ${version}    ${output}
     ...                       --security-counter    ${security_counter}
     ...                       --slot-size    0x75000    --pad    --hex-addr    0x83000
+
+Sign A Release
+    [Arguments]               ${version}    ${output}
+    # A release as the build signs it, with app/prj.conf's security counter: what the backend sends.
+    Sign                      ${RELEASE_KEY}    ${version}    ${output}
+    ...                       --security-counter    1    --slot-size    0x76000

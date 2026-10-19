@@ -1,5 +1,7 @@
 *** Settings ***
+Library                     OperatingSystem
 Library                     Process
+Resource                    images.resource
 
 *** Variables ***
 ${OXIMETER_IMAGE}           ${CURDIR}/../build/oximeter/app/zephyr/zephyr.signed.hex
@@ -19,6 +21,8 @@ ${DEVICE_ID}                0123456789abcdef
 ${PROVISIONED}              ${CURDIR}/../build/renode/provision.resc
 ${UNPROVISIONED}            ${CURDIR}/unprovisioned.resc
 ${UART}                     sysbus.uart0
+# The hub's slot 1 partition, where it keeps the image the backend sent (hub/src/update.c).
+${STAGING}                  0x82000
 ${SENSOR}                   sysbus.twi0.max30101
 ${ALARM_LED}                sysbus.gpio0.led0
 
@@ -99,6 +103,22 @@ Lets A New Gateway's Pairing Replace The Old One
     Execute Command           connector Connect sysbus.radio wireless
     Wait For Line On Uart     using the oximeter's bond    testerId=${hub}    timeout=15
     Wait For Line On Uart     not paired with the oximeter    testerId=${hub}    timeout=10
+
+Updates The Oximeter Over Bluetooth
+    # The backend's next release: the same firmware, signed as 1.1.0, staged in the hub's flash.
+    Sign A Release            1.1.0    ${TEST_IMAGES}/release-1.1.0.bin
+    ${size}=                  Get File Size    ${TEST_IMAGES}/release-1.1.0.bin
+    Start System
+    Execute Command           mach set "hub"
+    Execute Command           sysbus LoadBinary @${TEST_IMAGES}/release-1.1.0.bin ${STAGING}
+    ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
+    Monitor A Patient At 94 Percent
+    Write Line To Uart        update ${size}    testerId=${hub}
+    Wait For Line On Uart     the oximeter is restarting with the update    testerId=${hub}    timeout=120
+    # MCUboot checks it and swaps it in for a test boot; the oximeter keeps it once it works.
+    Wait For Line On Uart     medsec-oximeter 1.1.0+0 started    testerId=${oximeter}    timeout=30
+    Wait For Line On Uart     image marked as working    testerId=${oximeter}    timeout=30
+    Wait For Line On Uart     hub: SpO2 94%    testerId=${hub}    timeout=30
 
 Can't Pair With A Hub Without The Pairing Master
     Start System              ${HUB_STRANGER_ELF}

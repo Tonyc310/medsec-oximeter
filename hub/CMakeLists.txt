@@ -8,7 +8,7 @@ project(medsec_hub LANGUAGES C)
 
 set(CORE ${CMAKE_CURRENT_SOURCE_DIR}/../core)
 target_sources(app PRIVATE src/main.c src/device_keys.c src/limits_signer.c src/log_verifier.c
-    src/pairing.c
+    src/pairing.c src/update.c
     ${CORE}/src/alarm.c
     ${CORE}/src/limits_auth.c ${CORE}/src/plx.c ${CORE}/src/security_log.c
     ${COMMON}/src/medsec_crypto.c ${COMMON}/src/pairing_seal.c)
@@ -16,3 +16,5 @@ target_include_directories(app PRIVATE ${CORE}/include ${COMMON}/include)
 include(${COMMON}/master.cmake)
 medsec_master(signing)
 medsec_master(pairing)
+# The SMP image client includes MCUboot's image headers.
+target_link_libraries(app PRIVATE MCUBOOT_BOOTUTIL)
