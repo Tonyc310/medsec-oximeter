@@ -120,6 +120,24 @@ Updates The Oximeter Over Bluetooth
     Wait For Line On Uart     image marked as working    testerId=${oximeter}    timeout=30
     Wait For Line On Uart     hub: SpO2 94%    testerId=${hub}    timeout=30
 
+Refuses An Update From A Phone That Isn't Paired
+    Start System              ${PHONE_ELF}
+    Start Emulation
+    Wait For Line On Uart     to initialize the stack    testerId=${hub}
+    Write Line To Uart        bt init    testerId=${hub}
+    Wait For Line On Uart     Bluetooth initialized    testerId=${hub}
+    Write Line To Uart        bt connect-name medsec-oximeter    testerId=${hub}
+    Wait For Line On Uart     Connected:    testerId=${hub}    timeout=10
+    Write Line To Uart        gatt discover-characteristic    testerId=${hub}
+    ${found}=                 Wait For Line On Uart    Characteristic da2e7828-fbce-4e01-ae9e-261174997c48 found: handle ([0-9a-f]+)
+    ...                       testerId=${hub}    treatAsRegex=true    timeout=10
+    ${handle}=                Evaluate    hex(int(re.search("handle ([0-9a-f]+)", str($found)).group(1), 16) + 1)
+    ...                       modules=re
+    # The start of an upload (an SMP write to the image group's upload command): refused before
+    # the oximeter reads it, for insufficient authentication.
+    Write Line To Uart        gatt write ${handle} 0 0200000000010001    testerId=${hub}
+    Wait For Line On Uart     Write complete: err 0x05    testerId=${hub}    timeout=10
+
 Can't Pair With A Hub Without The Pairing Master
     Start System              ${HUB_STRANGER_ELF}
     Start Emulation
