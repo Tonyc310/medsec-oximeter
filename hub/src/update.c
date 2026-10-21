@@ -118,6 +118,8 @@ void update_link_secured(struct bt_conn *conn)
     responses.value = BT_GATT_CCC_NOTIFY;
     responses.notify = on_response;
     responses.subscribe = on_subscribed;
+    /* Made again on each link, as main.c's are. */
+    atomic_set_bit(responses.flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
 
     const int err = bt_gatt_subscribe(conn, &responses);
 

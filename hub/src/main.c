@@ -131,6 +131,9 @@ static void subscribe(struct bt_conn *conn, struct bt_gatt_subscribe_params *sub
     subscription->disc_params = ccc_discovery;
     subscription->value = BT_GATT_CCC_NOTIFY;
     subscription->notify = notify;
+    /* Dropped at every disconnect and made again on each link, after discovery. Zephyr would renew
+     * a bonded subscription by itself on reconnecting, from params this function has rewritten. */
+    atomic_set_bit(subscription->flags, BT_GATT_SUBSCRIBE_FLAG_VOLATILE);
 
     const int err = bt_gatt_subscribe(conn, subscription);
 

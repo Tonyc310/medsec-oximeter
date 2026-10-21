@@ -52,6 +52,10 @@ Start System With An Update
     ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
     Set Test Variable         ${oximeter}
 
+Reset The Oximeter
+    Execute Command           mach set "oximeter"
+    Execute Command           machine Reset
+
 Send The Update
     Write Line To Uart        update ${update_size}    testerId=${hub}
     Wait For Line On Uart     the oximeter is restarting with the update    testerId=${hub}    timeout=120
@@ -93,6 +97,29 @@ Keeps Its Pairing Through A Reset
     Wait For Line On Uart     link to the oximeter at security level 4    testerId=${hub}    timeout=10
     Should Not Be On Uart     pairing: paired    testerId=${oximeter}    timeout=1
     Wait For Line On Uart     hub: SpO2 94%    testerId=${hub}
+
+Hears Readings After Every Reconnection
+    Start System
+    ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
+    Monitor A Patient At 94 Percent
+    # Twice: the hub must subscribe on every new link, the third as much as the second.
+    FOR    ${reset}    IN RANGE    2
+        Reset The Oximeter
+        Wait For Line On Uart     link to the oximeter at security level 4    testerId=${hub}    timeout=10
+        Wait For Line On Uart     hub: SpO2 94%    testerId=${hub}    timeout=10
+    END
+
+Takes Update Commands After Every Reconnection
+    Start System
+    ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
+    Monitor A Patient At 94 Percent
+    FOR    ${reset}    IN RANGE    2
+        Reset The Oximeter
+        Wait For Line On Uart     ready to update the oximeter    testerId=${hub}    timeout=10
+    END
+    # 1.0.0 passed its self-test long ago, so the oximeter agrees to keep it.
+    Write Line To Uart        confirm    testerId=${hub}
+    Wait For Line On Uart     the oximeter keeps the image it runs for good    testerId=${hub}    timeout=10
 
 Lets A New Gateway's Pairing Replace The Old One
     Start System
