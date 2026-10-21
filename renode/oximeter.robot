@@ -41,6 +41,21 @@ Start System
     ${hub}=                   Create Terminal Tester    ${UART}    machine=hub
     Set Test Variable         ${hub}
 
+Start System With An Update
+    [Arguments]               ${image}
+    # The backend's image, staged in the hub's flash for its update command.
+    Start System
+    Execute Command           mach set "hub"
+    Execute Command           sysbus LoadBinary @${image} ${STAGING}
+    ${update_size}=           Get File Size    ${image}
+    Set Test Variable         ${update_size}
+    ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
+    Set Test Variable         ${oximeter}
+
+Send The Update
+    Write Line To Uart        update ${update_size}    testerId=${hub}
+    Wait For Line On Uart     the oximeter is restarting with the update    testerId=${hub}    timeout=120
+
 Monitor A Patient At 94 Percent
     # 94% on the calibration line SpO2 = 110 - 25 R needs R of about 0.64: the red pulse, against
     # its light level, about 0.64 times the infrared one (2000 on 130000). 1083 on 110000 is that.
@@ -107,14 +122,9 @@ Lets A New Gateway's Pairing Replace The Old One
 Updates The Oximeter Over Bluetooth
     # The backend's next release: the same firmware, signed as 1.1.0, staged in the hub's flash.
     Sign A Release            1.1.0    ${TEST_IMAGES}/release-1.1.0.bin
-    ${size}=                  Get File Size    ${TEST_IMAGES}/release-1.1.0.bin
-    Start System
-    Execute Command           mach set "hub"
-    Execute Command           sysbus LoadBinary @${TEST_IMAGES}/release-1.1.0.bin ${STAGING}
-    ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
+    Start System With An Update    ${TEST_IMAGES}/release-1.1.0.bin
     Monitor A Patient At 94 Percent
-    Write Line To Uart        update ${size}    testerId=${hub}
-    Wait For Line On Uart     the oximeter is restarting with the update    testerId=${hub}    timeout=120
+    Send The Update
     # MCUboot checks it and swaps it in for a test boot; the oximeter keeps it once it works.
     Wait For Line On Uart     medsec-oximeter 1.1.0+0 started    testerId=${oximeter}    timeout=30
     Wait For Line On Uart     image marked as working    testerId=${oximeter}    timeout=30
