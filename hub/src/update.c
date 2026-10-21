@@ -30,6 +30,7 @@ LOG_MODULE_REGISTER(update, LOG_LEVEL_INF);
  * at a time. */
 static struct bt_conn *oximeter;
 static uint16_t smp_handle;
+static bool subscribed;
 
 static struct smp_transport transport;
 static struct smp_client_transport_entry transport_entry;
@@ -70,6 +71,7 @@ static uint8_t on_response(struct bt_conn *conn, struct bt_gatt_subscribe_params
     ARG_UNUSED(conn);
     if (data == NULL) {
         params->value_handle = 0u;
+        subscribed = false;
         return BT_GATT_ITER_STOP;
     }
 
@@ -90,6 +92,20 @@ void update_found(struct bt_conn *conn, uint16_t handle)
     smp_handle = handle;
 }
 
+/* The oximeter answers in notifications: commands wait until their CCC write is through. */
+static void on_subscribed(struct bt_conn *conn, uint8_t err,
+                          struct bt_gatt_subscribe_params *params)
+{
+    ARG_UNUSED(conn);
+    ARG_UNUSED(params);
+    if (err != BT_ATT_ERR_SUCCESS) {
+        LOG_WRN("subscribing to SMP failed (ATT error 0x%02x)", err);
+        return;
+    }
+    subscribed = true;
+    LOG_INF("ready to update the oximeter");
+}
+
 void update_link_secured(struct bt_conn *conn)
 {
     if (smp_handle == 0u) {
@@ -101,6 +117,7 @@ void update_link_secured(struct bt_conn *conn)
     responses.disc_params = &responses_ccc;
     responses.value = BT_GATT_CCC_NOTIFY;
     responses.notify = on_response;
+    responses.subscribe = on_subscribed;
 
     const int err = bt_gatt_subscribe(conn, &responses);
 
@@ -119,6 +136,15 @@ static void on_disconnected(struct bt_conn *conn, uint8_t reason)
 BT_CONN_CB_DEFINE(update_connection_callbacks) = {
     .disconnected = on_disconnected,
 };
+
+static bool ready(const struct shell *sh)
+{
+    if ((oximeter == NULL) || !subscribed) {
+        shell_error(sh, "the oximeter isn't ready for updates");
+        return false;
+    }
+    return true;
+}
 
 static const char *uploaded_hash(void)
 {
@@ -148,8 +174,7 @@ static int cmd_update(const struct shell *sh, size_t argc, char **argv)
         shell_error(sh, "%s isn't the size of a staged image", argv[1]);
         return -EINVAL;
     }
-    if ((oximeter == NULL) || (responses.value_handle == 0u)) {
-        shell_error(sh, "no oximeter paired");
+    if (!ready(sh)) {
         return -ENOTCONN;
     }
     /* The shortest connection interval while the image goes: about 20 s rather than 2 min. */
@@ -180,6 +205,30 @@ static int cmd_update(const struct shell *sh, size_t argc, char **argv)
     LOG_INF("the oximeter is restarting with the update");
     return 0;
 }
+
+/* Standard MCUmgr tools confirm an update from outside once it's running, and the hub can do the
+ * same. This oximeter refuses: it keeps an update only once its own self-test passes. */
+static int cmd_confirm(const struct shell *sh, size_t argc, char **argv)
+{
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+    if (!ready(sh)) {
+        return -ENOTCONN;
+    }
+
+    struct mcumgr_image_state state = {0};
+    const int err = img_mgmt_client_state_write(&image_client, NULL, true, &state);
+
+    if ((err != MGMT_ERR_EOK) || (state.status != MGMT_ERR_EOK)) {
+        LOG_WRN("the oximeter refused to keep the update (%d, %d)", err, state.status);
+        return -EACCES;
+    }
+    LOG_INF("the oximeter keeps the image it runs for good");
+    return 0;
+}
+
+SHELL_CMD_REGISTER(confirm, NULL, "Ask the oximeter to keep the image it runs for good",
+                   cmd_confirm);
 
 SHELL_CMD_ARG_REGISTER(update, NULL,
                        "Send the oximeter the update staged in slot 1: update <size in bytes>",

@@ -100,7 +100,7 @@ python3 tools/provision.py --signing-master build/signing-master.key --pairing-m
 renode renode/oximeter.resc                # type `start`; each board's console opens in a window
 ```
 
-In the hub's window, `limits <SpO2 low %> <pulse low bpm> <pulse high bpm>` sets the oximeter's alarm limits, `log` prints its security event log, and `update <bytes>` sends it the update staged in the hub's slot 1 partition (load one there with Renode's `sysbus LoadBinary`, as the tests do). In Renode's monitor, `mach set "oximeter"` then `sysbus.twi0.max30101 HeartRate 130` (or `RedPulse`, `InfraredPulse`, `RedLevel`, `InfraredLevel`) changes the simulated patient.
+In the hub's window, `limits <SpO2 low %> <pulse low bpm> <pulse high bpm>` sets the oximeter's alarm limits, `log` prints its security event log, `update <bytes>` sends it the update staged in the hub's slot 1 partition (load one there with Renode's `sysbus LoadBinary`, as the tests do), and `confirm` asks it to keep the image it runs for good, as standard MCUmgr tools do once an update runs. In Renode's monitor, `mach set "oximeter"` then `sysbus.twi0.max30101 HeartRate 130` (or `RedPulse`, `InfraredPulse`, `RedLevel`, `InfraredLevel`) changes the simulated patient.
 
 ## Test
 
