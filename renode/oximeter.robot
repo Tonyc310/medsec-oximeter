@@ -173,6 +173,16 @@ Keeps An Update On Trial Whatever The Gateway Says
     Reset The Oximeter
     Wait For Line On Uart     medsec-oximeter 1.0.0+0 started    testerId=${oximeter}    timeout=30
 
+Refuses An Update Signed With Another Key
+    # As anyone could sign one: MCUboot's published key in place of the release key.
+    Sign A Release            1.1.0    ${TEST_IMAGES}/stranger-1.1.0.bin    ${PUBLISHED_KEY}
+    Start System With An Update    ${TEST_IMAGES}/stranger-1.1.0.bin
+    Monitor A Patient At 94 Percent
+    Send The Update
+    # MCUboot checks it at the reset and erases it, and the old version runs on.
+    Wait For Line On Uart     Image in the secondary slot is not valid    testerId=${oximeter}    timeout=30
+    Wait For Line On Uart     medsec-oximeter 1.0.0+0 started    testerId=${oximeter}    timeout=30
+
 Refuses An Update From A Phone That Isn't Paired
     Start System              ${PHONE_ELF}
     Start Emulation

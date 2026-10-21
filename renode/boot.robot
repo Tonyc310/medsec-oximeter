@@ -4,8 +4,6 @@ Resource                    images.resource
 *** Variables ***
 ${SCRIPT}                   ${CURDIR}/oximeter.resc
 ${SIGNED_IMAGE}             ${CURDIR}/../build/oximeter/app/zephyr/zephyr.signed.hex
-# The development key that comes with MCUboot, and sysbuild's default: its private half is public.
-${PUBLISHED_KEY}            ${CURDIR}/../deps/bootloader/mcuboot/root-ec-p256.pem
 # In the oximeter's program: its slot starts at 0xC000, after MCUboot, with a 0x200-byte header.
 ${PROGRAM_BYTE}             0xD000
 # Checking signatures needs no device keys.

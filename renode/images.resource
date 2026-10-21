@@ -7,6 +7,8 @@ Library                     Process
 ${UNSIGNED_IMAGE}           ${CURDIR}/../build/oximeter/app/zephyr/zephyr.hex
 ${IMGTOOL}                  ${CURDIR}/../deps/bootloader/mcuboot/scripts/imgtool.py
 ${RELEASE_KEY}              ${CURDIR}/../build/release-key.pem
+# The development key that comes with MCUboot, and sysbuild's default: its private half is public.
+${PUBLISHED_KEY}            ${CURDIR}/../deps/bootloader/mcuboot/root-ec-p256.pem
 ${TEST_IMAGES}              ${CURDIR}/../build/renode
 
 *** Keywords ***
@@ -32,7 +34,7 @@ Sign An Update
     ...                       --slot-size    0x75000    --pad    --hex-addr    0x83000
 
 Sign A Release
-    [Arguments]               ${version}    ${output}
+    [Arguments]               ${version}    ${output}    ${key}=${RELEASE_KEY}
     # A release as the build signs it, with app/prj.conf's security counter: what the backend sends.
-    Sign                      ${RELEASE_KEY}    ${version}    ${output}
+    Sign                      ${key}    ${version}    ${output}
     ...                       --security-counter    1    --slot-size    0x76000
