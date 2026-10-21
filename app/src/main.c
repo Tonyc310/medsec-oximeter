@@ -7,6 +7,7 @@
 #include "pairing_seal.h"
 #include "plx_service.h"
 #include "supervisor.h"
+#include "update_guard.h"
 
 #include <mbedtls/platform_util.h>
 #include <zephyr/device.h>
@@ -145,6 +146,7 @@ int main(void)
         LOG_ERR("could not set up pairing");
         return 0;
     }
+    update_guard_init();
     if (plx_service_start() != 0) {
         LOG_ERR("could not start Bluetooth");
         return 0;

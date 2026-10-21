@@ -157,6 +157,22 @@ Updates The Oximeter Over Bluetooth
     Wait For Line On Uart     image marked as working    testerId=${oximeter}    timeout=30
     Wait For Line On Uart     hub: SpO2 94%    testerId=${hub}    timeout=30
 
+Keeps An Update On Trial Whatever The Gateway Says
+    Sign A Release            1.1.0    ${TEST_IMAGES}/release-1.1.0.bin
+    Start System With An Update    ${TEST_IMAGES}/release-1.1.0.bin
+    Monitor A Patient At 94 Percent
+    # The sensor stops, so the update can never pass its self-test.
+    Execute Command           ${SENSOR} Stopped true
+    Send The Update
+    Wait For Line On Uart     medsec-oximeter 1.1.0+0 started    testerId=${oximeter}    timeout=30
+    Wait For Line On Uart     ready to update the oximeter    testerId=${hub}    timeout=30
+    # As standard update tools do after the reboot: ask the oximeter to keep the update for good.
+    Write Line To Uart        confirm    testerId=${hub}
+    Wait For Line On Uart     the oximeter refused to keep the update    testerId=${hub}    timeout=10
+    # No self-test passed, so the next reset brings the old version back.
+    Reset The Oximeter
+    Wait For Line On Uart     medsec-oximeter 1.0.0+0 started    testerId=${oximeter}    timeout=30
+
 Refuses An Update From A Phone That Isn't Paired
     Start System              ${PHONE_ELF}
     Start Emulation
