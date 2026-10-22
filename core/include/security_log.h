@@ -19,7 +19,9 @@
 
 /* The codes are part of the format: never renumber them. */
 typedef enum {
-    SECURITY_EVENT_START = 1,           /* detail: the reset cause, as hwinfo flags (LE32) */
+    /* detail: the reset cause, as hwinfo flags (LE32), then the running image's version: major,
+     * minor, revision (LE16). Its build number doesn't fit. */
+    SECURITY_EVENT_START = 1,
     SECURITY_EVENT_CONNECTED = 2,       /* detail: the central's address type, then address */
     SECURITY_EVENT_DISCONNECTED = 3,    /* detail: the HCI reason */
     SECURITY_EVENT_LIMITS_ACCEPTED = 4, /* detail: the limits, as alarm_limits_encode sends them */

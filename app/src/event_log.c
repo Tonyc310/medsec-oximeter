@@ -78,7 +78,7 @@ static int load(void)
     return err;
 }
 
-int event_log_start(void)
+int event_log_start(const struct mcuboot_img_sem_ver *running)
 {
     uint32_t cause = 0u;
     int err = settings_subsys_init();
@@ -97,8 +97,14 @@ int event_log_start(void)
     if (hwinfo_get_reset_cause(&cause) == 0) {
         (void)hwinfo_clear_reset_cause();
     }
-    const uint8_t detail[] = {(uint8_t)cause, (uint8_t)(cause >> 8), (uint8_t)(cause >> 16),
-                              (uint8_t)(cause >> 24)};
+    const uint8_t detail[] = {(uint8_t)cause,
+                              (uint8_t)(cause >> 8),
+                              (uint8_t)(cause >> 16),
+                              (uint8_t)(cause >> 24),
+                              running->major,
+                              running->minor,
+                              (uint8_t)running->revision,
+                              (uint8_t)(running->revision >> 8)};
 
     return event_log_record(SECURITY_EVENT_START, detail, sizeof detail);
 }

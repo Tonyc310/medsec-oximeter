@@ -94,19 +94,21 @@ static void on_stall(void)
     alarm_service_update(&none);
 }
 
-/* The version MCUboot checked: from the signed header of the slot this image runs from. */
-static void log_start(void)
+/* Logs the version MCUboot checked, from the signed header of the slot this image runs from, and
+ * returns it: zero if the header can't be read. */
+static struct mcuboot_img_sem_ver log_start(void)
 {
     struct mcuboot_img_header header;
 
     if (boot_read_bank_header(boot_fetch_active_slot(), &header, sizeof header) != 0) {
         LOG_INF("medsec-oximeter started; its image header can't be read");
-        return;
+        return (struct mcuboot_img_sem_ver){0};
     }
-    const struct mcuboot_img_sem_ver *const version = &header.h.v1.sem_ver;
+    const struct mcuboot_img_sem_ver version = header.h.v1.sem_ver;
 
-    LOG_INF("medsec-oximeter %u.%u.%u+%u started", version->major, version->minor,
-            version->revision, version->build_num);
+    LOG_INF("medsec-oximeter %u.%u.%u+%u started", version.major, version.minor, version.revision,
+            version.build_num);
+    return version;
 }
 
 /* A key from UICR into the module that uses it, wiping the copy here. */
@@ -128,14 +130,15 @@ int main(void)
         .chan = SENSOR_CHAN_RED,
     };
 
-    log_start();
+    const struct mcuboot_img_sem_ver version = log_start();
+
     /* Before the log starts, so even the start-up record is tagged. Without a key, records are
      * still kept, with tags that verify against nothing; without a pairing key, nothing can
      * pair. */
     load_key(DEVICE_KEY_LOG, log_mac_init, "log");
     load_key(DEVICE_KEY_PAIRING, pairing_seal_init, "pairing");
     /* Monitoring goes on without the log if it can't start. */
-    if (event_log_start() != 0) {
+    if (event_log_start(&version) != 0) {
         LOG_ERR("security event log unavailable");
     }
     oximetry_init(&oximetry);

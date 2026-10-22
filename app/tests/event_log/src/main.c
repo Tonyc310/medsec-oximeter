@@ -10,6 +10,9 @@
 static const uint8_t log_key[20] = {0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b,
                                     0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b};
 
+/* The version the tests start: what a start-up record holds doesn't matter here. */
+static const struct mcuboot_img_sem_ver running = {.major = 1u};
+
 static security_record_t records[SECURITY_LOG_CAPACITY];
 static uint8_t entries[SECURITY_LOG_CAPACITY * SECURITY_LOG_ENTRY_SIZE];
 
@@ -33,10 +36,10 @@ ZTEST(event_log, test_records_survive_a_restart)
     static const uint8_t limits[] = {95u, 50u, 0u, 120u, 0u};
     static const uint8_t central[] = {1u, 0xDDu, 0xCCu, 0xBBu, 0xAAu, 0x00u, 0xC0u};
 
-    zassert_ok(event_log_start());
+    zassert_ok(event_log_start(&running));
     zassert_ok(event_log_record(SECURITY_EVENT_CONNECTED, central, sizeof central));
     zassert_ok(event_log_record(SECURITY_EVENT_LIMITS_ACCEPTED, limits, sizeof limits));
-    zassert_ok(event_log_start());
+    zassert_ok(event_log_start(&running));
 
     const uint32_t count = read_back();
     const security_record_t *last = &records[count - 4u];
@@ -59,9 +62,9 @@ ZTEST(event_log, test_keeps_each_record_tagged_through_a_restart)
 {
     psa_key_id_t verifier = PSA_KEY_ID_NULL;
 
-    zassert_ok(event_log_start());
+    zassert_ok(event_log_start(&running));
     zassert_ok(event_log_record(SECURITY_EVENT_SENSOR_STOPPED, NULL, 0u));
-    zassert_ok(event_log_start());
+    zassert_ok(event_log_start(&running));
 
     const uint32_t count = read_back();
 

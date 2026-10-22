@@ -399,8 +399,8 @@ static void describe(const security_record_t *record, char *text, size_t size)
 
     switch (record->event) {
     case SECURITY_EVENT_START:
-        (void)snprintf(text, size, "started (reset cause 0x%08x)",
-                       (unsigned int)sys_get_le32(detail));
+        (void)snprintf(text, size, "started %u.%u.%u (reset cause 0x%08x)", detail[4], detail[5],
+                       sys_get_le16(&detail[6]), (unsigned int)sys_get_le32(detail));
         break;
     case SECURITY_EVENT_CONNECTED:
         describe_central(detail, central, sizeof central);

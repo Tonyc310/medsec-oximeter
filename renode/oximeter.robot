@@ -352,6 +352,16 @@ Logs An Update Marked For Test
     Write Line To Uart        log    testerId=${hub}
     Wait For Line On Uart     boot 1 \\+[0-9.]+ s: update marked for test: 1\\.1\\.0\\+0    testerId=${hub}    treatAsRegex=true
 
+Logs The Version It Starts
+    Sign A Release            1.1.0    ${TEST_IMAGES}/release-1.1.0.bin
+    Start System With An Update    ${TEST_IMAGES}/release-1.1.0.bin
+    Monitor A Patient At 94 Percent
+    Send The Update
+    Wait For Line On Uart     link to the oximeter at security level 4    testerId=${hub}    timeout=30
+    Write Line To Uart        log    testerId=${hub}
+    # So the backend sees whether an update took: here it did.
+    Wait For Line On Uart     boot 2 \\+[0-9.]+ s: started 1\\.1\\.0 \\(    testerId=${hub}    treatAsRegex=true
+
 Can't Be Paired Or Changed Without A Device Key
     Start System              provisioning=${UNPROVISIONED}
     ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter

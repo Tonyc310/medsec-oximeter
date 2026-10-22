@@ -5,10 +5,11 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <zephyr/dfu/mcuboot.h>
 
-/** Loads the log from flash and records the start-up, with the reset cause. Call before Bluetooth
- * starts. Returns 0 or -errno. */
-int event_log_start(void);
+/** Loads the log from flash and records the start-up, with the reset cause and the version that
+ * runs. Call before Bluetooth starts. Returns 0 or -errno. */
+int event_log_start(const struct mcuboot_img_sem_ver *running);
 
 /** Records an event with up to SECURITY_LOG_DETAIL_SIZE bytes of detail, from any thread.
  * Returns 0 or -errno. */
