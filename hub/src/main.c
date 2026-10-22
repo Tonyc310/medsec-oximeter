@@ -441,6 +441,10 @@ static void describe(const security_record_t *record, char *text, size_t size)
         describe_central(&detail[1], central, sizeof central);
         (void)snprintf(text, size, "pairing refused: %s: %s", pairing_refusal(detail[0]), central);
         break;
+    case SECURITY_EVENT_UPDATE_PENDING:
+        (void)snprintf(text, size, "update marked for test: %u.%u.%u+%u", detail[0], detail[1],
+                       sys_get_le16(&detail[2]), (unsigned int)sys_get_le32(&detail[4]));
+        break;
     default:
         (void)snprintf(text, size, "unknown event %u", record->event);
         break;

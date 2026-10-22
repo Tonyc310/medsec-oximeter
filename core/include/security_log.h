@@ -31,9 +31,12 @@ typedef enum {
     SECURITY_EVENT_NO_DEVICE_KEY = 9, /* at start-up: none provisioned, so no limits change works */
     SECURITY_EVENT_PAIRED = 10,       /* detail: the central's address type, then address */
     SECURITY_EVENT_PAIRING_REFUSED = 11, /* detail: Zephyr's bt_security_err, then the address */
+    /* detail: the version of the image marked for a test boot: major, minor, revision (LE16), build
+     * (LE32) */
+    SECURITY_EVENT_UPDATE_PENDING = 12,
 } security_event_t;
 
-#define SECURITY_EVENT_LAST SECURITY_EVENT_PAIRING_REFUSED
+#define SECURITY_EVENT_LAST SECURITY_EVENT_UPDATE_PENDING
 
 typedef struct {
     uint32_t sequence; /* from 1 */

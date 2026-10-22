@@ -134,11 +134,11 @@ static void test_decodes_a_record_back_to_its_fields(void)
 /* The newest event code is a known one. */
 static void test_restores_a_record_of_the_newest_event(void)
 {
-    const security_record_t newest = {.sequence = 4u, .event = SECURITY_EVENT_PAIRING_REFUSED};
+    const security_record_t newest = {.sequence = 4u, .event = SECURITY_EVENT_UPDATE_PENDING};
     uint8_t stored[SECURITY_LOG_RECORD_SIZE];
     security_record_t record = {0};
 
-    TEST_ASSERT_EQUAL_UINT8(11u, SECURITY_EVENT_PAIRING_REFUSED);
+    TEST_ASSERT_EQUAL_UINT8(12u, SECURITY_EVENT_UPDATE_PENDING);
     security_log_encode(&newest, stored);
     security_log_restore(&security, stored, sizeof stored);
     (void)security_log_next(&security, &record);

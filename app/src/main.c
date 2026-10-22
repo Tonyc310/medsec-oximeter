@@ -8,6 +8,7 @@
 #include "plx_service.h"
 #include "supervisor.h"
 #include "update_guard.h"
+#include "update_log.h"
 
 #include <mbedtls/platform_util.h>
 #include <zephyr/device.h>
@@ -147,6 +148,7 @@ int main(void)
         return 0;
     }
     update_guard_init();
+    update_log_init();
     if (plx_service_start() != 0) {
         LOG_ERR("could not start Bluetooth");
         return 0;
