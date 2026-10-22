@@ -14,6 +14,7 @@ Create The Platform
     Execute Command           include @${CURDIR}/Max30101.cs
     Execute Command           include @${CURDIR}/Nvmc.cs
     Execute Command           include @${CURDIR}/Ccm.cs
+    Execute Command           include @${CURDIR}/Radio.cs
     Execute Command           mach create
     Execute Command           machine LoadPlatformDescription @${CURDIR}/nrf52840dk-oximeter.repl
 

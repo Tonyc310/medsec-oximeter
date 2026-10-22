@@ -14,7 +14,7 @@ Phase 3, the architecture views and threat model, is under way in [docs/security
 
 Phase 4, the security controls, has started with the threat model's central case: a change of alarm limits must now be signed (see [Alarms](#alarms)). MCUboot also checks the firmware's signature at every boot and keeps an update only once it works (see [Secure boot and updates](#secure-boot-and-updates)). The Bluetooth link is paired and encrypted, authenticated with keys only the backend can make (see [Bluetooth](#bluetooth)).
 
-Renode has no model of the MAX30101, so [renode/Max30101.cs](renode/Max30101.cs) adds one: the registers Zephyr's driver uses, the 32-sample FIFO filled at the configured rate, the interrupt line, and a synthetic pulse waveform whose light level, pulse depth and heart rate a test can set. Nor does it model the nRF52840's flash controller, which keeping anything in flash needs: [renode/Nvmc.cs](renode/Nvmc.cs) erases flash pages, and Zephyr's own flash driver tests check it. Nor the CCM, which encrypts and decrypts Bluetooth packets on an encrypted link: [renode/Ccm.cs](renode/Ccm.cs) adds it, checked against the Bluetooth specification's own sample data.
+Renode has no model of the MAX30101, so [renode/Max30101.cs](renode/Max30101.cs) adds one: the registers Zephyr's driver uses, the 32-sample FIFO filled at the configured rate, the interrupt line, and a synthetic pulse waveform whose light level, pulse depth and heart rate a test can set. Nor does it model the nRF52840's flash controller, which keeping anything in flash needs: [renode/Nvmc.cs](renode/Nvmc.cs) erases flash pages, and Zephyr's own flash driver tests check it. Nor the CCM, which encrypts and decrypts Bluetooth packets on an encrypted link: [renode/Ccm.cs](renode/Ccm.cs) adds it, checked against the Bluetooth specification's own sample data. And Renode's radio model hears a frame it missed whenever it next listens, late and even on another channel, which on an encrypted link breaks the packet sequence and drops the link: [renode/Radio.cs](renode/Radio.cs) is Renode's model with that fixed, and [renode/nrf52840dk.repl](renode/nrf52840dk.repl) Renode's description of the board, using it (both MIT, [renode/LICENSE-renode](renode/LICENSE-renode)).
 
 ## How it measures
 
@@ -151,10 +151,16 @@ west build -b nrf52840dk/nrf52840 -d build/flash-test deps/zephyr/tests/drivers/
 cd build/renode && renode-test ../../renode/flash.robot
 ```
 
-The last checks the CCM model against the Bluetooth Core specification's sample data (Vol 6, Part C): it encrypts and decrypts the specification's packets byte for byte, reports a packet it can't authenticate, passes empty packets through unencrypted, and signals the end of decryption with the interrupt Zephyr's controller waits for:
+Another checks the CCM model against the Bluetooth Core specification's sample data (Vol 6, Part C): it encrypts and decrypts the specification's packets byte for byte, reports a packet it can't authenticate, passes empty packets through unencrypted, and signals the end of decryption with the interrupt Zephyr's controller waits for:
 
 ```bash
 cd build/renode && renode-test ../../renode/ccm.robot
+```
+
+The last checks the radio model with two radios and no firmware: a frame sent while the other isn't listening is lost if it listens 5 ms later, or on another channel, and heard if it listens 150 µs later, still in the same exchange:
+
+```bash
+cd build/renode && renode-test ../../renode/radio.robot
 ```
 
 ## Layout
@@ -166,7 +172,7 @@ common/         what the two applications share: Bluetooth and crypto definition
 core/           the oximetry analysis, the PLX encoding, the alarm checks and signed limit changes: portable C17, no Zephyr
 tests/          Unity tests for core/, run on the host
 tools/          provision.py: the factory's step, an oximeter's limits key into UICR
-renode/         Renode platform, scripts, the MAX30101, flash controller and CCM models, and the Robot tests
+renode/         Renode platform, scripts, the MAX30101, flash controller, CCM and radio models, and the Robot tests
 docs/security/  the cybersecurity documentation for a premarket submission
 deps/           Zephyr and its modules, fetched by west (git-ignored)
 ```

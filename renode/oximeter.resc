@@ -9,6 +9,7 @@ $hub_bin?=$ORIGIN/../build/hub/zephyr/zephyr.elf
 include $ORIGIN/Max30101.cs
 include $ORIGIN/Nvmc.cs
 include $ORIGIN/Ccm.cs
+include $ORIGIN/Radio.cs
 
 emulation CreateBLEMedium "wireless"
 
