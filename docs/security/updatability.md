@@ -38,8 +38,8 @@ sequenceDiagram
     M->>M: swap slots 0 and 1, boot the new image
     M->>A: start
     A->>A: self-test passes: mark the image OK
-    G->>A: read image state
-    G->>B: report the running version
+    G->>A: read the security log
+    G->>B: the log: update marked for test, then the version that started
 ```
 
 | Hop | From, to | Carries | Protocol | Protection | Status |
@@ -72,7 +72,7 @@ FDA asks what happens when an update is interrupted, at each phase of the proces
 | What happens | Result | Status |
 |---|---|---|
 | The Bluetooth link drops during the upload | slot 1 holds a partial image that is never booted. The running image is untouched, and the gateway starts the upload again on the next connection | planned |
-| The image fails its signature or rollback check | MCUboot erases it from slot 1 and boots the current image. The app is to report the rejection to the gateway and record it in the security log, with the upload (hop 4) | MCUboot's part done; reporting planned |
+| The image fails its signature or rollback check | MCUboot erases it from slot 1 and boots the current image. The security log shows the update marked for a test boot with its version, then a start-up of the version before (`app/src/update_log.c`), so the backend sees it didn't take. It doesn't say why: only MCUboot's console does | done |
 | Power is lost during the swap | MCUboot records the swap's progress in the slots' trailers and finishes it after the next reset. MCUboot's own simulator tests this, cutting power at each flash write of a swap in turn, and its CI runs it with swap using offset; Renode tests here would add nothing to that | done, MCUboot's tests |
 | The new image boots but doesn't pass its self-test, or hangs | it never marks itself OK, and won't let the gateway mark it. A watchdog (T-17) resets a hung image. At the next reset MCUboot swaps the previous image back | done |
 | The new image passes its self-test | it marks itself OK and the swap becomes permanent | done |
