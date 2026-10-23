@@ -1,4 +1,17 @@
 #include <zephyr/dt-bindings/gpio/arduino-header-r3.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+/ {
+	/* Button 1 held for 5 s resets the oximeter for a new patient (src/new_patient.c). Long enough
+	 * that a patient lying on it, or a brush in passing, doesn't. */
+	new_patient_press: new-patient-press {
+		compatible = "zephyr,input-longpress";
+		input = <&{/buttons}>;
+		input-codes = <INPUT_KEY_0>;
+		long-codes = <INPUT_KEY_DELETE>;
+		long-delay-ms = <5000>;
+	};
+};
 
 /* Renode models the nRF52840's TWI, not its TWIM (EasyDMA) variant of the same I2C block, so
  * the firmware uses TWI and the image tested in simulation is the one that runs on the board. */

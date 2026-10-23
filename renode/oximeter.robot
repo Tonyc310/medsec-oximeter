@@ -52,6 +52,17 @@ Start System With An Update
     ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
     Set Test Variable         ${oximeter}
 
+Hold Button 1
+    # Renode's GPIOTE misses a pin's first edge after Zephyr sets up its interrupt, so a tap first
+    # shows it the button is up.
+    Execute Command           mach set "oximeter"
+    Execute Command           sysbus.gpio0.sw0 PressAndRelease
+    Execute Command           sysbus.gpio0.sw0 Press
+
+Release Button 1
+    Execute Command           mach set "oximeter"
+    Execute Command           sysbus.gpio0.sw0 Release
+
 Reset The Oximeter
     Execute Command           mach set "oximeter"
     Execute Command           machine Reset
@@ -143,6 +154,18 @@ Lets A New Gateway's Pairing Replace The Old One
     Execute Command           connector Disconnect sysbus.radio wireless
     Execute Command           mach set "hub"
     Execute Command           connector Connect sysbus.radio wireless
+    Wait For Line On Uart     using the oximeter's bond    testerId=${hub}    timeout=15
+    Wait For Line On Uart     not paired with the oximeter    testerId=${hub}    timeout=10
+
+Forgets Its Gateway For A New Patient
+    Start System
+    ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
+    Monitor A Patient At 94 Percent
+    # As staff do before the oximeter goes to the next patient: Button 1 held for 5 s.
+    Hold Button 1
+    Wait For Line On Uart     reset for a new patient    testerId=${oximeter}    timeout=10
+    Release Button 1
+    Wait For Line On Uart     medsec-oximeter 1.0.0+0 started    testerId=${oximeter}
     Wait For Line On Uart     using the oximeter's bond    testerId=${hub}    timeout=15
     Wait For Line On Uart     not paired with the oximeter    testerId=${hub}    timeout=10
 
