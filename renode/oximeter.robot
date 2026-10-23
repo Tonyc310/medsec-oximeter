@@ -169,6 +169,18 @@ Forgets Its Gateway For A New Patient
     Wait For Line On Uart     using the oximeter's bond    testerId=${hub}    timeout=15
     Wait For Line On Uart     not paired with the oximeter    testerId=${hub}    timeout=10
 
+Goes Back To The Default Limits For A New Patient
+    Start System
+    Monitor A Patient At 94 Percent
+    Write Line To Uart        limits 95 50 120    testerId=${hub}
+    Wait For Line On Uart     oximeter accepted the alarm limits    testerId=${hub}
+    # The last patient's limits are no one else's: the next starts with the defaults.
+    ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
+    Hold Button 1
+    Wait For Line On Uart     reset for a new patient    testerId=${oximeter}    timeout=10
+    Release Button 1
+    Wait For Line On Uart     alarm limits: SpO2 below 90%, pulse below 50 or above 120 bpm    testerId=${oximeter}
+
 Updates The Oximeter Over Bluetooth
     # The backend's next release: the same firmware, signed as 1.1.0, staged in the hub's flash.
     Sign A Release            1.1.0    ${TEST_IMAGES}/release-1.1.0.bin

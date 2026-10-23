@@ -1,3 +1,5 @@
+#include "limits_store.h"
+
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/input/input.h>
@@ -8,15 +10,18 @@
 LOG_MODULE_REGISTER(new_patient, LOG_LEVEL_INF);
 
 /* Before the oximeter goes to the next patient, staff hold Button 1 for 5 s: it forgets the
- * gateway it was paired with and starts again, so a gateway must pair afresh, which the backend
- * allows only for the next patient's. Bluetooth and flash calls need the system work queue's
- * stack, not the input thread's. */
+ * gateway it was paired with and the clinician's limits, and starts again with the defaults. A
+ * gateway must then pair afresh, which the backend allows only for the next patient's. Bluetooth
+ * and flash calls need the system work queue's stack, not the input thread's. */
 static void reset_for_new_patient(struct k_work *work)
 {
     ARG_UNUSED(work);
-    LOG_WRN("reset for a new patient: forgetting the gateway");
+    LOG_WRN("reset for a new patient: forgetting the gateway and the alarm limits");
     if (bt_unpair(BT_ID_DEFAULT, BT_ADDR_LE_ANY) != 0) {
         LOG_ERR("could not forget the gateway");
+    }
+    if (limits_store_clear() != 0) {
+        LOG_ERR("could not forget the alarm limits");
     }
     /* The log goes out before the restart that would cut it off. */
     log_panic();

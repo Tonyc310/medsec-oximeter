@@ -36,3 +36,8 @@ int limits_store_save(const alarm_limits_t *limits)
     alarm_limits_encode(limits, value);
     return settings_save_one(LIMITS_STORE_KEY, value, sizeof value);
 }
+
+int limits_store_clear(void)
+{
+    return settings_delete(LIMITS_STORE_KEY);
+}

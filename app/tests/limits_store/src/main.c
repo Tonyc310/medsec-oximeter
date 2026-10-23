@@ -34,6 +34,19 @@ ZTEST(limits_store, test_restores_the_last_saved_limits)
     zassert_equal(limits.pulse_high_bpm, 130u);
 }
 
+/* As the new-patient reset does, so the next patient starts with the defaults. */
+ZTEST(limits_store, test_forgets_the_limits_when_cleared)
+{
+    const alarm_limits_t raised = {
+        .spo2_low_percent = 95u, .pulse_low_bpm = 40u, .pulse_high_bpm = 130u};
+    alarm_limits_t limits = {0};
+
+    zassert_ok(limits_store_save(&raised));
+    zassert_ok(limits_store_clear());
+    zassert_ok(limits_store_load(&limits));
+    assert_defaults(&limits);
+}
+
 /* Flash holding anything but limits a monitor would accept, whatever put it there. */
 ZTEST(limits_store, test_keeps_the_defaults_when_the_stored_value_is_not_valid)
 {

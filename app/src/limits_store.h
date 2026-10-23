@@ -13,4 +13,7 @@ int limits_store_load(alarm_limits_t *limits);
 /** Stores `limits` so they survive a reset. Returns 0 or -errno. */
 int limits_store_save(const alarm_limits_t *limits);
 
+/** Forgets the stored limits, so the next load gives the defaults. Returns 0 or -errno. */
+int limits_store_clear(void);
+
 #endif
