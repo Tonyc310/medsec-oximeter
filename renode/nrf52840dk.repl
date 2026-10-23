@@ -1,6 +1,6 @@
 // Renode 1.17's nRF52840 (platforms/cpus/nrf52840.repl) and nRF52840 DK
 // (platforms/boards/nrf52840dk_nrf52840.repl) in one file, from Antmicro under the MIT License
-// (LICENSE-renode), with the radio from Radio.cs.
+// (LICENSE-renode), with the radio from Radio.cs and the buttons active low.
 
 nvic: IRQControllers.NVIC @ sysbus 0xE000E000
     -> cpu@0
@@ -141,14 +141,19 @@ led2: Miscellaneous.LED @ gpio0 15
 led3: Miscellaneous.LED @ gpio0 16
     invert: true
 
+// The DK's buttons pull their pins to ground; Renode's file drives them high when pressed.
 sw0: Miscellaneous.Button @ gpio0 11
+    invert: true
     -> gpio0@11
 
 sw1: Miscellaneous.Button @ gpio0 12
+    invert: true
     -> gpio0@12
 
 sw2: Miscellaneous.Button @ gpio0 24
+    invert: true
     -> gpio0@24
 
 sw3: Miscellaneous.Button @ gpio0 25
+    invert: true
     -> gpio0@25
