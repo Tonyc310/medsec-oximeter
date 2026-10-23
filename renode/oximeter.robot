@@ -181,6 +181,16 @@ Goes Back To The Default Limits For A New Patient
     Release Button 1
     Wait For Line On Uart     alarm limits: SpO2 below 90%, pulse below 50 or above 120 bpm    testerId=${oximeter}
 
+Ignores A Short Press
+    Start System
+    ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
+    Monitor A Patient At 94 Percent
+    # A second's press, as from a patient lying on it: nothing is forgotten.
+    Hold Button 1
+    Should Not Be On Uart     reset for a new patient    testerId=${oximeter}    timeout=1
+    Release Button 1
+    Should Not Be On Uart     reset for a new patient    testerId=${oximeter}    timeout=6
+
 Updates The Oximeter Over Bluetooth
     # The backend's next release: the same firmware, signed as 1.1.0, staged in the hub's flash.
     Sign A Release            1.1.0    ${TEST_IMAGES}/release-1.1.0.bin
