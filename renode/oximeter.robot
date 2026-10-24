@@ -63,6 +63,14 @@ Release Button 1
     Execute Command           mach set "oximeter"
     Execute Command           sysbus.gpio0.sw0 Release
 
+Reset The Oximeter For A New Patient
+    # As staff do before the oximeter goes to the next patient: Button 1 held for 5 s.
+    ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
+    Set Test Variable         ${oximeter}
+    Hold Button 1
+    Wait For Line On Uart     reset for a new patient    testerId=${oximeter}    timeout=10
+    Release Button 1
+
 Reset The Oximeter
     Execute Command           mach set "oximeter"
     Execute Command           machine Reset
@@ -159,12 +167,8 @@ Lets A New Gateway's Pairing Replace The Old One
 
 Forgets Its Gateway For A New Patient
     Start System
-    ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
     Monitor A Patient At 94 Percent
-    # As staff do before the oximeter goes to the next patient: Button 1 held for 5 s.
-    Hold Button 1
-    Wait For Line On Uart     reset for a new patient    testerId=${oximeter}    timeout=10
-    Release Button 1
+    Reset The Oximeter For A New Patient
     Wait For Line On Uart     medsec-oximeter 1.0.0+0 started    testerId=${oximeter}
     Wait For Line On Uart     using the oximeter's bond    testerId=${hub}    timeout=15
     Wait For Line On Uart     not paired with the oximeter    testerId=${hub}    timeout=10
@@ -175,10 +179,7 @@ Goes Back To The Default Limits For A New Patient
     Write Line To Uart        limits 95 50 120    testerId=${hub}
     Wait For Line On Uart     oximeter accepted the alarm limits    testerId=${hub}
     # The last patient's limits are no one else's: the next starts with the defaults.
-    ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
-    Hold Button 1
-    Wait For Line On Uart     reset for a new patient    testerId=${oximeter}    timeout=10
-    Release Button 1
+    Reset The Oximeter For A New Patient
     Wait For Line On Uart     alarm limits: SpO2 below 90%, pulse below 50 or above 120 bpm    testerId=${oximeter}
 
 Ignores A Short Press
