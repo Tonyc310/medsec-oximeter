@@ -420,6 +420,17 @@ Logs The Version It Starts
     # So the backend sees whether an update took: here it did.
     Wait For Line On Uart     boot 2 \\+[0-9.]+ s: started 1\\.1\\.0 \\(    testerId=${hub}    treatAsRegex=true
 
+Logs The Reset For A New Patient
+    Start System
+    Monitor A Patient At 94 Percent
+    Reset The Oximeter For A New Patient
+    Wait For Line On Uart     the oximeter has forgotten this hub    testerId=${hub}    timeout=20
+    Write Line To Uart        pair    testerId=${hub}
+    Wait For Line On Uart     link to the oximeter at security level 4    testerId=${hub}    timeout=20
+    Write Line To Uart        log    testerId=${hub}
+    # The log outlasts the reset: it is the oximeter's own record, not the patient's.
+    Wait For Line On Uart     boot 1 \\+[0-9.]+ s: reset for a new patient    testerId=${hub}    treatAsRegex=true
+
 Can't Be Paired Or Changed Without A Device Key
     Start System              provisioning=${UNPROVISIONED}
     ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter

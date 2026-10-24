@@ -1,3 +1,4 @@
+#include "event_log.h"
 #include "limits_store.h"
 
 #include <zephyr/bluetooth/bluetooth.h>
@@ -17,6 +18,8 @@ static void reset_for_new_patient(struct k_work *work)
 {
     ARG_UNUSED(work);
     LOG_WRN("reset for a new patient: forgetting the gateway and the alarm limits");
+    /* First, so the log shows the reset even if what follows fails. */
+    (void)event_log_record(SECURITY_EVENT_NEW_PATIENT, NULL, 0u);
     if (bt_unpair(BT_ID_DEFAULT, BT_ADDR_LE_ANY) != 0) {
         LOG_ERR("could not forget the gateway");
     }

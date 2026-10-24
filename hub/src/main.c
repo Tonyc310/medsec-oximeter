@@ -445,6 +445,9 @@ static void describe(const security_record_t *record, char *text, size_t size)
         (void)snprintf(text, size, "update marked for test: %u.%u.%u+%u", detail[0], detail[1],
                        sys_get_le16(&detail[2]), (unsigned int)sys_get_le32(&detail[4]));
         break;
+    case SECURITY_EVENT_NEW_PATIENT:
+        (void)snprintf(text, size, "reset for a new patient");
+        break;
     default:
         (void)snprintf(text, size, "unknown event %u", record->event);
         break;

@@ -36,9 +36,10 @@ typedef enum {
     /* detail: the version of the image marked for a test boot: major, minor, revision (LE16), build
      * (LE32) */
     SECURITY_EVENT_UPDATE_PENDING = 12,
+    SECURITY_EVENT_NEW_PATIENT = 13, /* reset for a new patient: gateway and limits forgotten */
 } security_event_t;
 
-#define SECURITY_EVENT_LAST SECURITY_EVENT_UPDATE_PENDING
+#define SECURITY_EVENT_LAST SECURITY_EVENT_NEW_PATIENT
 
 typedef struct {
     uint32_t sequence; /* from 1 */
