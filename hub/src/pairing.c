@@ -2,10 +2,12 @@
 
 #include "pairing_seal.h"
 
+#include <errno.h>
 #include <mbedtls/platform_util.h>
 #include <string.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/shell/shell.h>
 
 LOG_MODULE_REGISTER(pairing, LOG_LEVEL_INF);
 
@@ -19,6 +21,11 @@ static uint8_t sealed[PAIRING_SEALED_SIZE];
 static size_t sealed_length;
 static struct bt_gatt_read_params sealed_read;
 static struct bt_le_oob_sc_data oximeter_oob;
+
+/* Set from the Bluetooth receive thread, read from the shell's: the oximeter that no longer knows
+ * this hub's bond, until the hub pairs with it again. */
+static bt_addr_le_t forgotten_by;
+static bool forgotten;
 
 static uint8_t on_sealed(struct bt_conn *conn, uint8_t err, struct bt_gatt_read_params *params,
                          const void *data, uint16_t length)
@@ -121,6 +128,48 @@ static struct bt_conn_auth_info_cb auth_info_callbacks = {
     .pairing_complete = on_pairing_complete,
     .pairing_failed = on_pairing_failed,
 };
+
+/* An oximeter reset for a new patient has no key for the bond: encryption with it fails, key
+ * missing. The hub pairs again only when the backend allows it, as it does for the next patient's
+ * gateway alone. */
+static void on_security_changed(struct bt_conn *conn, bt_security_t level, enum bt_security_err err)
+{
+    ARG_UNUSED(level);
+    if (err == BT_SECURITY_ERR_PIN_OR_KEY_MISSING) {
+        bt_addr_le_copy(&forgotten_by, bt_conn_get_dst(conn));
+        forgotten = true;
+        LOG_WRN("the oximeter has forgotten this hub");
+    }
+}
+
+BT_CONN_CB_DEFINE(pairing_connection_callbacks) = {
+    .security_changed = on_security_changed,
+};
+
+/* The backend's go-ahead, which the hub stands in for. Dropping the bond also ends the link, and
+ * the next connection pairs with the oximeter's sealed data. */
+static int cmd_pair(const struct shell *sh, size_t argc, char **argv)
+{
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+    if (!forgotten) {
+        shell_error(sh, "no oximeter has forgotten this hub");
+        return -ENOENT;
+    }
+    forgotten = false;
+
+    const int err = bt_unpair(BT_ID_DEFAULT, &forgotten_by);
+
+    if (err != 0) {
+        shell_error(sh, "couldn't drop the oximeter's bond: %d", err);
+        return err;
+    }
+    LOG_INF("pairing with the oximeter again");
+    return 0;
+}
+
+SHELL_CMD_REGISTER(pair, NULL, "Pair again with the oximeter that has forgotten this hub",
+                   cmd_pair);
 
 int pairing_init(void)
 {

@@ -192,6 +192,18 @@ Ignores A Short Press
     Release Button 1
     Should Not Be On Uart     reset for a new patient    testerId=${oximeter}    timeout=6
 
+Pairs Again Once The Backend Allows It
+    Start System
+    Monitor A Patient At 94 Percent
+    Reset The Oximeter For A New Patient
+    # The hub doesn't pair again by itself: in the real system the backend decides which gateway
+    # serves the next patient, and opens the oximeter's sealed data only for that one.
+    Wait For Line On Uart     the oximeter has forgotten this hub    testerId=${hub}    timeout=20
+    Should Not Be On Uart     pairing: paired with the oximeter    testerId=${hub}    timeout=3
+    Write Line To Uart        pair    testerId=${hub}
+    Wait For Line On Uart     pairing: paired with the oximeter    testerId=${hub}    timeout=20
+    Wait For Line On Uart     hub: SpO2 94%    testerId=${hub}    timeout=10
+
 Updates The Oximeter Over Bluetooth
     # The backend's next release: the same firmware, signed as 1.1.0, staged in the hub's flash.
     Sign A Release            1.1.0    ${TEST_IMAGES}/release-1.1.0.bin
