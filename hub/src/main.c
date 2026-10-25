@@ -12,6 +12,7 @@
 
 #include <errno.h>
 #include <mbedtls/platform_util.h>
+#include <psa/crypto.h>
 #include <stdio.h>
 #include <string.h>
 #include <zephyr/bluetooth/bluetooth.h>
@@ -36,6 +37,7 @@ static const struct bt_uuid_128 alarm_limits = BT_UUID_INIT_128(MEDSEC_ALARM_LIM
 static const struct bt_uuid_128 alarm_state = BT_UUID_INIT_128(MEDSEC_ALARM_STATE_VAL);
 static const struct bt_uuid_128 alarm_challenge = BT_UUID_INIT_128(MEDSEC_ALARM_CHALLENGE_VAL);
 static const struct bt_uuid_128 security_log = BT_UUID_INIT_128(MEDSEC_SECURITY_LOG_VAL);
+static const struct bt_uuid_128 log_head = BT_UUID_INIT_128(MEDSEC_LOG_HEAD_VAL);
 static const struct bt_uuid_128 device_id = BT_UUID_INIT_128(MEDSEC_DEVICE_ID_VAL);
 static const struct bt_uuid_128 sealed_pairing_data =
     BT_UUID_INIT_128(MEDSEC_SEALED_PAIRING_DATA_VAL);
@@ -48,6 +50,7 @@ static uint16_t limits_handle;
 static uint16_t state_handle;
 static uint16_t challenge_handle;
 static uint16_t log_handle;
+static uint16_t log_head_handle;
 static uint16_t device_id_handle;
 static uint16_t sealed_handle;
 static struct bt_gatt_read_params device_id_read;
@@ -197,7 +200,7 @@ static void read_device_id(struct bt_conn *conn)
     }
 }
 
-/* One pass over every characteristic, noting the seven the hub uses; then learn the oximeter's ID,
+/* One pass over every characteristic, noting the eight the hub uses; then learn the oximeter's ID,
  * to pair with it and sign for it. */
 static uint8_t on_characteristic(struct bt_conn *conn, const struct bt_gatt_attr *attr,
                                  struct bt_gatt_discover_params *params)
@@ -205,8 +208,8 @@ static uint8_t on_characteristic(struct bt_conn *conn, const struct bt_gatt_attr
     ARG_UNUSED(params);
     if (attr == NULL) {
         if ((measurement_handle == 0u) || (limits_handle == 0u) || (state_handle == 0u) ||
-            (challenge_handle == 0u) || (log_handle == 0u) || (device_id_handle == 0u) ||
-            (sealed_handle == 0u)) {
+            (challenge_handle == 0u) || (log_handle == 0u) || (log_head_handle == 0u) ||
+            (device_id_handle == 0u) || (sealed_handle == 0u)) {
             LOG_WRN("not a pulse oximeter this hub knows");
             return BT_GATT_ITER_STOP;
         }
@@ -226,6 +229,8 @@ static uint8_t on_characteristic(struct bt_conn *conn, const struct bt_gatt_attr
         challenge_handle = characteristic->value_handle;
     } else if (bt_uuid_cmp(characteristic->uuid, &security_log.uuid) == 0) {
         log_handle = characteristic->value_handle;
+    } else if (bt_uuid_cmp(characteristic->uuid, &log_head.uuid) == 0) {
+        log_head_handle = characteristic->value_handle;
     } else if (bt_uuid_cmp(characteristic->uuid, &device_id.uuid) == 0) {
         device_id_handle = characteristic->value_handle;
     } else if (bt_uuid_cmp(characteristic->uuid, &sealed_pairing_data.uuid) == 0) {
@@ -340,6 +345,8 @@ static int cmd_limits(const struct shell *sh, size_t argc, char **argv)
 static struct bt_gatt_read_params log_read;
 static uint8_t log_entries[SECURITY_LOG_CAPACITY * SECURITY_LOG_ENTRY_SIZE];
 static size_t log_length;
+/* The newest record `log` read that verified: what `check` compares the oximeter's answer with. */
+static uint32_t newest_read;
 
 static const char *refusal(uint8_t reason)
 {
@@ -474,6 +481,9 @@ static void print_log(void)
         const bool genuine = log_verifier_check(&log_entries[at]);
 
         verified += genuine ? 1u : 0u;
+        if (genuine && (record.sequence > newest_read)) {
+            newest_read = record.sequence;
+        }
         describe(&record, text, sizeof text);
         LOG_INF("#%u boot %u +%u.%03u s: %s (%s)", (unsigned int)record.sequence, record.boot,
                 (unsigned int)(record.uptime_ms / 1000u), (unsigned int)(record.uptime_ms % 1000u),
@@ -527,6 +537,108 @@ static int cmd_log(const struct shell *sh, size_t argc, char **argv)
 }
 
 SHELL_CMD_REGISTER(log, NULL, "Print the oximeter's security event log, oldest first", cmd_log);
+
+/* Asking how far the log goes takes two steps: write a fresh challenge, then read the answer to
+ * it. The parameters and data must stay valid until the oximeter answers each step. */
+static struct bt_gatt_write_params head_write;
+static struct bt_gatt_read_params head_read;
+static uint8_t head_challenge[SECURITY_LOG_CHALLENGE_SIZE];
+static uint8_t head_answer[SECURITY_LOG_HEAD_ANSWER_SIZE];
+static size_t head_length;
+
+/* Records the oximeter holds beyond the newest the hub read were lost on the way or held back. */
+static void report_head(void)
+{
+    uint32_t newest = 0u;
+
+    if ((head_length != sizeof head_answer) ||
+        !log_verifier_check_head(head_challenge, head_answer, &newest)) {
+        LOG_WRN("the oximeter's answer on its log doesn't verify");
+    } else if (newest == newest_read) {
+        LOG_INF("the oximeter's log is complete up to record #%u", (unsigned int)newest);
+    } else if (newest > newest_read) {
+        const uint32_t unread = newest - newest_read;
+
+        LOG_WRN("the oximeter has %u %s the hub hasn't read, up to #%u", (unsigned int)unread,
+                (unread == 1u) ? "record" : "records", (unsigned int)newest);
+    } else {
+        LOG_WRN("the oximeter's log ends at #%u, before the #%u the hub read", (unsigned int)newest,
+                (unsigned int)newest_read);
+    }
+}
+
+static uint8_t on_head(struct bt_conn *conn, uint8_t err, struct bt_gatt_read_params *params,
+                       const void *data, uint16_t length)
+{
+    ARG_UNUSED(conn);
+    ARG_UNUSED(params);
+    if (err != 0u) {
+        LOG_WRN("reading the oximeter's answer on its log failed (ATT error 0x%02x)", err);
+        return BT_GATT_ITER_STOP;
+    }
+    if (data == NULL) {
+        report_head();
+        return BT_GATT_ITER_STOP;
+    }
+    if (length > (sizeof head_answer - head_length)) {
+        LOG_WRN("the oximeter's answer on its log is too long");
+        return BT_GATT_ITER_STOP;
+    }
+    (void)memcpy(&head_answer[head_length], data, length);
+    head_length += length;
+    return BT_GATT_ITER_CONTINUE;
+}
+
+static void on_head_challenge_written(struct bt_conn *conn, uint8_t err,
+                                      struct bt_gatt_write_params *params)
+{
+    ARG_UNUSED(params);
+    if (err != 0u) {
+        LOG_WRN("the oximeter refused the challenge on its log (ATT error 0x%02x)", err);
+        return;
+    }
+    head_length = 0u;
+    head_read.func = on_head;
+    head_read.handle_count = 1u;
+    head_read.single.handle = log_head_handle;
+    head_read.single.offset = 0u;
+
+    const int read_err = bt_gatt_read(conn, &head_read);
+
+    if (read_err != 0) {
+        LOG_ERR("reading the oximeter's answer on its log failed: %d", read_err);
+    }
+}
+
+/* As the backend would ask: a fresh random challenge each time, so an old answer can't stand in. */
+static int cmd_check(const struct shell *sh, size_t argc, char **argv)
+{
+    ARG_UNUSED(argc);
+    ARG_UNUSED(argv);
+    if ((oximeter == NULL) || (log_head_handle == 0u)) {
+        shell_error(sh, "no oximeter connected");
+        return -ENOTCONN;
+    }
+    if (psa_generate_random(head_challenge, sizeof head_challenge) != PSA_SUCCESS) {
+        shell_error(sh, "no random challenge");
+        return -EIO;
+    }
+    head_write.func = on_head_challenge_written;
+    head_write.handle = log_head_handle;
+    head_write.offset = 0u;
+    head_write.data = head_challenge;
+    head_write.length = sizeof head_challenge;
+
+    const int err = bt_gatt_write(oximeter, &head_write);
+
+    if (err != 0) {
+        shell_error(sh, "writing the challenge failed: %d", err);
+    }
+    return err;
+}
+
+SHELL_CMD_REGISTER(check, NULL, "Ask the oximeter how far its log goes, against what `log` read",
+                   cmd_check);
 
 SHELL_CMD_ARG_REGISTER(limits, NULL,
                        "Set the oximeter's alarm limits: limits <SpO2 low %> <pulse low bpm> "

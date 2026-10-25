@@ -14,6 +14,8 @@
 #define MEDSEC_ALARM_CHALLENGE_VAL MEDSEC_UUID(4) /* what a limits change is signed over: read */
 #define MEDSEC_SECURITY_LOG_VAL MEDSEC_UUID(5)    /* security event records, oldest first: read */
 #define MEDSEC_DEVICE_ID_VAL MEDSEC_UUID(6)       /* the ID its key is derived from: read */
+/* How far the log goes: write a backend's challenge, then read the answer to it. */
+#define MEDSEC_LOG_HEAD_VAL MEDSEC_UUID(9)
 
 /* What the oximeter protects needs security level 4: authenticated (AUTHEN) LE Secure Connections
  * (LESC). Either flag alone accepts less: LESC alone takes an unauthenticated Just Works pairing.

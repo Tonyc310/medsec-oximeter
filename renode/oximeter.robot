@@ -459,3 +459,12 @@ Can't Verify The Log Without The Signing Master
     # A gateway without the signing master can read the log but can neither vouch for it nor forge it.
     Write Line To Uart        log    testerId=${hub}
     Wait For Line On Uart     [0-9]+ security records, 0 verified    testerId=${hub}    treatAsRegex=true
+
+Shows The Log It Read Is Complete
+    Start System
+    Monitor A Patient At 94 Percent
+    Write Line To Uart        log    testerId=${hub}
+    Wait For Line On Uart     security records,    testerId=${hub}
+    # The backend's fresh challenge, answered under the oximeter's log key: nothing held back.
+    Write Line To Uart        check    testerId=${hub}
+    Wait For Line On Uart     the oximeter's log is complete up to record #    testerId=${hub}

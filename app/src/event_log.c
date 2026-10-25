@@ -9,6 +9,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/settings/settings.h>
+#include <zephyr/sys/byteorder.h>
 
 /* Each record is kept under its slot's key, medsec/log/0 to medsec/log/63, so a new record
  * overwrites the oldest in flash as it does in the log. */
@@ -144,6 +145,20 @@ int event_log_record(security_event_t event, const void *detail, size_t length)
         LOG_WRN("security event %u not saved (%d)", (unsigned int)event, err);
     }
     return err;
+}
+
+int event_log_answer(const uint8_t challenge[SECURITY_LOG_CHALLENGE_SIZE],
+                     uint8_t answer[SECURITY_LOG_HEAD_ANSWER_SIZE])
+{
+    uint8_t message[SECURITY_LOG_HEAD_MESSAGE_SIZE];
+
+    (void)k_mutex_lock(&lock, K_FOREVER);
+    const uint32_t newest = security_log_last(&security);
+
+    k_mutex_unlock(&lock);
+    security_log_head_message(challenge, newest, message);
+    sys_put_le32(newest, answer);
+    return log_mac_tag(message, sizeof message, &answer[sizeof newest]) ? 0 : -EACCES;
 }
 
 size_t event_log_read(uint8_t *out, size_t size)
