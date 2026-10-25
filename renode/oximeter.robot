@@ -468,3 +468,14 @@ Shows The Log It Read Is Complete
     # The backend's fresh challenge, answered under the oximeter's log key: nothing held back.
     Write Line To Uart        check    testerId=${hub}
     Wait For Line On Uart     the oximeter's log is complete up to record #    testerId=${hub}
+
+Shows Records The Hub Hasn't Read
+    Start System
+    Monitor A Patient At 94 Percent
+    Write Line To Uart        log    testerId=${hub}
+    Wait For Line On Uart     security records,    testerId=${hub}
+    # A record written after the log was read stands for one a gateway held back.
+    Write Line To Uart        limits 95 50 120    testerId=${hub}
+    Wait For Line On Uart     oximeter accepted the alarm limits    testerId=${hub}
+    Write Line To Uart        check    testerId=${hub}
+    Wait For Line On Uart     the oximeter has 1 record the hub hasn't read    testerId=${hub}
