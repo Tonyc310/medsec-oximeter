@@ -170,6 +170,26 @@ static void test_names_the_newest_record(void)
     TEST_ASSERT_EQUAL_UINT32(42u, security_log_last(&security));
 }
 
+/* The label keeps an answer's tag from ever passing as a record's, or a record's as an answer's:
+ * records are 20 bytes, this 35. */
+static void test_encodes_the_answer_to_a_challenge_as_the_backend_checks_it(void)
+{
+    static const uint8_t challenge[SECURITY_LOG_CHALLENGE_SIZE] = {
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
+    static const uint8_t expected[SECURITY_LOG_HEAD_MESSAGE_SIZE] = {
+        'm',  'e',  'd',  's',  'e',  'c',  ' ',  'l',
+        'o',  'g',  ' ',  'h',  'e',  'a',  'd', /* label */
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, /* challenge */
+        0x04, 0x03, 0x02, 0x01,                         /* newest sequence */
+    };
+    uint8_t message[SECURITY_LOG_HEAD_MESSAGE_SIZE];
+
+    security_log_head_message(challenge, 0x01020304u, message);
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(expected, message, sizeof message);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -182,5 +202,6 @@ int main(void)
     RUN_TEST(test_restores_a_record_of_the_newest_event);
     RUN_TEST(test_reads_the_records_back_oldest_first);
     RUN_TEST(test_names_the_newest_record);
+    RUN_TEST(test_encodes_the_answer_to_a_challenge_as_the_backend_checks_it);
     return UNITY_END();
 }

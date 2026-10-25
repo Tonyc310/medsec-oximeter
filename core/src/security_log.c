@@ -94,3 +94,17 @@ uint32_t security_log_slot(const security_log_t *security, uint32_t index)
 
     return (oldest + index - 1u) % SECURITY_LOG_CAPACITY;
 }
+
+/* The label goes in without its terminator. */
+#define HEAD_LABEL "medsec log head"
+#define HEAD_LABEL_SIZE (sizeof HEAD_LABEL - 1u)
+_Static_assert(HEAD_LABEL_SIZE + SECURITY_LOG_CHALLENGE_SIZE + 4u == SECURITY_LOG_HEAD_MESSAGE_SIZE,
+               "the message is the label, the challenge and the sequence");
+
+void security_log_head_message(const uint8_t challenge[SECURITY_LOG_CHALLENGE_SIZE],
+                               uint32_t sequence, uint8_t out[SECURITY_LOG_HEAD_MESSAGE_SIZE])
+{
+    memcpy(out, HEAD_LABEL, HEAD_LABEL_SIZE);
+    memcpy(&out[HEAD_LABEL_SIZE], challenge, SECURITY_LOG_CHALLENGE_SIZE);
+    put_le32(&out[HEAD_LABEL_SIZE + SECURITY_LOG_CHALLENGE_SIZE], sequence);
+}

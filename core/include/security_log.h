@@ -17,6 +17,14 @@
 /* The newest records kept; older ones are overwritten. */
 #define SECURITY_LOG_CAPACITY 64u
 
+/* A gateway could hold back the newest records unseen until a later one shows the gap, so the
+ * backend asks the oximeter how far its log goes: it sends a fresh random challenge, and the
+ * oximeter answers with its newest record's sequence number (LE32) and a tag under the log key
+ * over security_log_head_message. */
+#define SECURITY_LOG_CHALLENGE_SIZE 16u
+#define SECURITY_LOG_HEAD_ANSWER_SIZE (4u + SECURITY_LOG_TAG_SIZE)
+#define SECURITY_LOG_HEAD_MESSAGE_SIZE 35u
+
 /* The codes are part of the format: never renumber them. */
 typedef enum {
     /* detail: the reset cause, as hwinfo flags (LE32), then the running image's version: major,
@@ -78,5 +86,10 @@ uint32_t security_log_slot(const security_log_t *security, uint32_t index);
 bool security_log_decode(const uint8_t *data, size_t length, security_record_t *record);
 
 void security_log_encode(const security_record_t *record, uint8_t out[SECURITY_LOG_RECORD_SIZE]);
+
+/** What the answer to `challenge` is tagged over: the label "medsec log head", the challenge, then
+ * `sequence` (LE32). */
+void security_log_head_message(const uint8_t challenge[SECURITY_LOG_CHALLENGE_SIZE],
+                               uint32_t sequence, uint8_t out[SECURITY_LOG_HEAD_MESSAGE_SIZE]);
 
 #endif
