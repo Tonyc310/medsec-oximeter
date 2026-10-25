@@ -77,6 +77,11 @@ void security_log_restore(security_log_t *security, const uint8_t *data, size_t 
     }
 }
 
+uint32_t security_log_last(const security_log_t *security)
+{
+    return security->last_sequence;
+}
+
 uint32_t security_log_count(const security_log_t *security)
 {
     return (security->last_sequence < SECURITY_LOG_CAPACITY) ? security->last_sequence

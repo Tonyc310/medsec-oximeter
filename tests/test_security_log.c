@@ -159,6 +159,17 @@ static void test_reads_the_records_back_oldest_first(void)
     TEST_ASSERT_EQUAL_UINT32(5u, security_log_slot(&security, SECURITY_LOG_CAPACITY - 1u));
 }
 
+/* What the oximeter tells a backend that asks how far its log goes. */
+static void test_names_the_newest_record(void)
+{
+    security_record_t record = {0};
+
+    TEST_ASSERT_EQUAL_UINT32(0u, security_log_last(&security));
+    restore(41u);
+    (void)security_log_next(&security, &record);
+    TEST_ASSERT_EQUAL_UINT32(42u, security_log_last(&security));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -170,5 +181,6 @@ int main(void)
     RUN_TEST(test_ignores_malformed_records_found_in_flash);
     RUN_TEST(test_restores_a_record_of_the_newest_event);
     RUN_TEST(test_reads_the_records_back_oldest_first);
+    RUN_TEST(test_names_the_newest_record);
     return UNITY_END();
 }

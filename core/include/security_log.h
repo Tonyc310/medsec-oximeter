@@ -67,6 +67,9 @@ uint32_t security_log_next(security_log_t *security, security_record_t *record);
 /** How many records the log holds: at most SECURITY_LOG_CAPACITY. */
 uint32_t security_log_count(const security_log_t *security);
 
+/** The newest record's sequence number: 0 while the log is empty. */
+uint32_t security_log_last(const security_log_t *security);
+
 /** The slot of the `index`th record, counting from the oldest. */
 uint32_t security_log_slot(const security_log_t *security, uint32_t index);
 
