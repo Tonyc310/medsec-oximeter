@@ -5,6 +5,7 @@
 #include "log_mac.h"
 #include "log_verifier.h"
 
+#include <zephyr/sys/byteorder.h>
 #include <zephyr/ztest.h>
 
 #include <stdint.h>
@@ -198,6 +199,67 @@ ZTEST(limits_signer, test_refuses_a_record_tagged_with_another_devices_key)
     tag_as_oximeter(other_id, entry);
     check_as_backend_for(oximeter_id);
     zassert_false(log_verifier_check(entry));
+}
+
+static const uint8_t challenge[SECURITY_LOG_CHALLENGE_SIZE] = {
+    0x3c, 0x51, 0x9e, 0x07, 0xd2, 0x64, 0xab, 0x18, 0xf5, 0x2e, 0x80, 0x4d, 0x96, 0x0b, 0x73, 0xc9};
+
+/* The answer the oximeter with `id` gives to `asked`: its newest record's sequence number,
+ * tagged with that device's log key. */
+static void answer_as_oximeter(const uint8_t id[DEVICE_ID_SIZE],
+                               const uint8_t asked[SECURITY_LOG_CHALLENGE_SIZE], uint32_t newest,
+                               uint8_t answer[SECURITY_LOG_HEAD_ANSWER_SIZE])
+{
+    uint8_t key[DEVICE_KEY_SIZE];
+    uint8_t message[SECURITY_LOG_HEAD_MESSAGE_SIZE];
+
+    zassert_true(device_keys_derive(shared_key, sizeof shared_key, DEVICE_KEY_LOG, id, key));
+    zassert_true(log_mac_init(key, sizeof key));
+    security_log_head_message(asked, newest, message);
+    sys_put_le32(newest, answer);
+    zassert_true(log_mac_tag(message, sizeof message, &answer[sizeof newest]));
+}
+
+ZTEST(limits_signer, test_accepts_the_oximeters_answer_to_its_challenge)
+{
+    uint8_t answer[SECURITY_LOG_HEAD_ANSWER_SIZE];
+    uint32_t newest = 0u;
+
+    answer_as_oximeter(oximeter_id, challenge, 42u, answer);
+    check_as_backend_for(oximeter_id);
+    zassert_true(log_verifier_check_head(challenge, answer, &newest));
+    zassert_equal(newest, 42u);
+}
+
+/* What a gateway holding back records might send: an answer to an earlier challenge, replayed; one
+ * with the number lowered to hide the newest; or another oximeter's. */
+ZTEST(limits_signer, test_refuses_an_answer_it_didnt_ask_for)
+{
+    static const uint8_t earlier[SECURITY_LOG_CHALLENGE_SIZE] = {0x3c, 0x51, 0x9e, 0x07, 0xd2, 0x64,
+                                                                 0xab, 0x18, 0xf5, 0x2e, 0x80, 0x4d,
+                                                                 0x96, 0x0b, 0x73, 0xca};
+    static const struct {
+        const char *name;
+        const uint8_t *id;
+        const uint8_t *asked;
+        bool lowered;
+    } cases[] = {
+        {"answer to an earlier challenge", oximeter_id, earlier, false},
+        {"number lowered", oximeter_id, challenge, true},
+        {"another oximeter's answer", other_id, challenge, false},
+    };
+
+    for (size_t i = 0u; i < ARRAY_SIZE(cases); i++) {
+        uint8_t answer[SECURITY_LOG_HEAD_ANSWER_SIZE];
+        uint32_t newest = 0u;
+
+        answer_as_oximeter(cases[i].id, cases[i].asked, 42u, answer);
+        if (cases[i].lowered) {
+            sys_put_le32(41u, answer);
+        }
+        check_as_backend_for(oximeter_id);
+        zassert_false(log_verifier_check_head(challenge, answer, &newest), "%s", cases[i].name);
+    }
 }
 
 /* Both sides start each test holding the same key, as the oximeter and its hub do. */
