@@ -161,7 +161,7 @@ flowchart LR
 | T-34 | T | An older, genuinely signed image with a known vulnerability is installed again (rollback) | reopens a fixed vulnerability | **not yet built** | ADV-3, ADV-4 |
 | T-35 | S, I | The signing key is stolen or misused, so the attacker's firmware passes as the manufacturer's | as T-33 | **not yet built**: no signing key exists yet | ADV-5 |
 | T-36 | T | A third-party component (Zephyr, the Bluetooth controller, the gateway's Linux packages) has a vulnerability or a planted flaw, as in SweynTooth (2020) | depends on the flaw: up to T-16 | **partly mitigated**: Zephyr is pinned to a release; there's no SBOM or vulnerability monitoring yet | ADV-5 |
-| T-37 | I | A device passed to a new patient, or discarded, still holds the last patient's pairings, keys or settings | privacy harm; a stale pairing lets the old gateway connect | **mitigated**: holding Button 1 for 5 s forgets the gateway's bond and the clinician's limits and records the reset, and a gateway pairs again only with the backend's go-ahead. Residual: the security log stays, as the oximeter's audit trail, with limit values and the gateway's address but nothing that names a patient; the factory keys stay too, for the backend to revoke when the device is discarded | ADV-2 |
+| T-37 | I | A device passed to a new patient, or discarded, still holds the last patient's pairings, keys or settings | privacy harm; a stale pairing lets the old gateway connect | **partly mitigated**: today nothing is stored across a reset (see T-06) | ADV-2 |
 
 ## Coverage
 
