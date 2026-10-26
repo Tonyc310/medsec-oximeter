@@ -86,3 +86,12 @@ Refuses An Older Release
     Start Emulation
     Wait For Line On Uart     erased due to downgrade prevention    testerId=${oximeter}
     Wait For Line On Uart     medsec-oximeter 1.0.0+0 started    testerId=${oximeter}
+
+Refuses An Unsigned Update
+    # Hashed, so MCUboot can tell it's intact, but signed by no one.
+    Sign An Update            1.1.0    1    ${TEST_IMAGES}/unsigned-update.hex    key=${EMPTY}
+    Load The Oximeter
+    Load The Update           ${TEST_IMAGES}/unsigned-update.hex
+    Start Emulation
+    Wait For Line On Uart     Image in the secondary slot is not valid    testerId=${oximeter}
+    Wait For Line On Uart     medsec-oximeter 1.0.0+0 started    testerId=${oximeter}
