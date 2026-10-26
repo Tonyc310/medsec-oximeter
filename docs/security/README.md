@@ -13,7 +13,8 @@ The cybersecurity documentation FDA's premarket guidance (February 2026 edition)
 | Other architecture views | multi-patient harm, security use cases | architecture views | Phase 3 |
 | Risk assessment | each threat's exploitability (MITRE's CVSS rubric for medical devices) and severity of patient harm, before and after controls | cybersecurity risk assessment | Phases 3 and 4 |
 | Security controls | requirements and their implementation | security architecture | Phase 4 |
-| SBOM and vulnerability assessment | every software component and its known vulnerabilities | SBOM; vulnerability assessment | Phase 5 |
+| [SBOM](sbom.md) | every software component, its version, supplier, identifiers and support, made from each build | SBOM | done |
+| Vulnerability assessment | each component's known vulnerabilities and what they mean for this device | vulnerability assessment | Phase 5 |
 | Test report | method, expected and actual result for every control | cybersecurity testing | Phase 6 |
 | Management plan and labeling | postmarket vulnerability handling; what users are told | management plan; labeling | Phase 7 |
 | Traceability | threat → control → test → result | traceability | grows each phase |
