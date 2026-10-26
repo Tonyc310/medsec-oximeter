@@ -13,7 +13,13 @@ add_library(project_warnings INTERFACE)
 target_compile_options(project_warnings INTERFACE -Wall -Wextra -Wpedantic -Wshadow -Wconversion
     -Wsign-conversion -Wdouble-promotion -Wfloat-equal -Werror)
 
+option(MEDSEC_FUZZ "Build the fuzz targets instead of the unit tests (needs clang)" OFF)
+
 add_subdirectory(core)
 
-enable_testing()
-add_subdirectory(tests)
+if(MEDSEC_FUZZ)
+    add_subdirectory(fuzz)
+else()
+    enable_testing()
+    add_subdirectory(tests)
+endif()

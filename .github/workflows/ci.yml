@@ -18,7 +18,7 @@ jobs:
         run: >-
           pipx run clang-format==23.1.2 --dry-run --Werror
           app/src/*.[ch] app/tests/*/src/*.c hub/src/*.[ch] hub/tests/*/src/*.c common/include/*.h common/src/*.c
-          core/include/*.h core/src/*.c tests/*.c
+          core/include/*.h core/src/*.c tests/*.c fuzz/*.c
 
   python:
     runs-on: ubuntu-24.04
@@ -65,6 +65,30 @@ jobs:
         run: >-
           cppcheck --std=c11 --enable=warning,style,performance,portability --inline-suppr
           --error-exitcode=1 -q -I core/include core/src
+
+  # libFuzzer on core/'s parsers of what other devices send, a minute each. Each run starts from
+  # nothing: the inputs are a few bytes long, so the fuzzer finds their shape within seconds.
+  fuzz:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build the fuzz targets
+        run: CC=clang cmake --workflow --preset fuzz
+
+      - name: Fuzz
+        run: |
+          mkdir -p build/fuzz/crashes
+          for target in build/fuzz/fuzz/fuzz_*; do
+            "$target" -max_total_time=60 -artifact_prefix=build/fuzz/crashes/
+          done
+
+      - name: Upload the inputs that failed
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fuzz-crashes
+          path: build/fuzz/crashes/
 
   firmware:
     runs-on: ubuntu-24.04

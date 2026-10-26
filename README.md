@@ -116,6 +116,13 @@ clang-tidy -p build/host core/src/*.c
 cppcheck --std=c11 --enable=warning,style,performance,portability -I core/include core/src
 ```
 
+libFuzzer gives the parsers of what other devices send any bytes at all, under the same sanitizers, and checks a property on every input. Whatever arrives as a limit change, the limits in force are the ones before or ones a monitor accepts, even with a MAC check that passes every tag, as a compromised backend key would. CI runs each target for a minute. The fuzz build needs clang:
+
+```bash
+CC=clang cmake --workflow --preset fuzz
+for target in build/fuzz/fuzz/fuzz_*; do "$target" -max_total_time=60; done
+```
+
 The unit tests cover the oximetry analysis, the PLX encoder and decoder, the alarm checks and limit settings, the checks on signed limit changes, the check that the sensor keeps sending samples, the security event log's records and numbering and the message that says how far it goes, and the check that a device key was provisioned. Code that needs Zephyr runs its tests as Zephyr programs on the PC (`native_sim`): the PSA Crypto binding that gives those checks HMAC-SHA-256 and tags the security log, against RFC 4231's test vectors; the hub's signer and its derivation of each oximeter's key (HKDF-SHA256, against RFC 5869's test vectors), against the oximeter's own checks, and its check of the oximeter's answer on how far its log goes, which refuses one replayed from an earlier challenge, one with the number changed, and another oximeter's; the storage that keeps the alarm limits and the security event log through a reset, on simulated flash; and the sealing of the oximeter's pairing data (AES-CCM), which opens only with the same key and device ID and never reuses a nonce:
 
 ```bash
@@ -183,6 +190,7 @@ hub/            the stand-in gateway's Zephyr application, and tests for its sig
 common/         what the two applications share: Bluetooth and crypto definitions, crypto settings
 core/           the oximetry analysis, the PLX encoding, the alarm checks and signed limit changes: portable C17, no Zephyr
 tests/          Unity tests for core/, run on the host
+fuzz/           libFuzzer targets for core/'s parsers
 tools/          provision.py, the factory's step that puts an oximeter's keys into UICR; sbom.py, the SBOM of a build; vulns.py, the vulnerability check; tests/
 renode/         Renode platform, scripts, the MAX30101, flash controller, CCM and radio models, and the Robot tests
 docs/security/  the cybersecurity documentation for a premarket submission
