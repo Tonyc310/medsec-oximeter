@@ -107,6 +107,17 @@ Nordic's [security advisories](https://docs.nordicsemi.com/r/bundle/struct_sa/pa
 | SA-2024-375 | Physical attacks on Matter's device attestation key | Not affected: the oximeter doesn't run Matter. |
 | SA-2023-234 | Unauthorized Thread network key updates | Not affected: the oximeter doesn't run Thread. |
 
+## Found by fuzzing
+
+Fuzzing the update protocol ([fuzz/smp](../../fuzz/smp)) under UndefinedBehaviorSanitizer finds undefined behavior at two places in Zephyr 4.4.2's MCUmgr, both still on Zephyr's main branch. Neither has a CVE.
+
+| Where | What | Assessment |
+|---|---|---|
+| `zcbor_map_decode_bulk`, in `subsys/mgmt/mcumgr/util/src/zcbor_bulk.c` | Calls each value's decoder through a function pointer of another type (CERT EXP37-C). | Not affected. The call is the same whatever a request's bytes, and on Arm the types agree where it matters: each decoder takes two pointers and returns a bool. |
+| `ERASED_VAL_32`, in `img_mgmt_priv.h`, used by `img_mgmt_read_info` and `img_mgmt_flash_check_empty_inner` | Shifts the flash's erased byte, 0xFF promoted to `int`, left by 24 (CERT INT34-C). | Not affected. The byte is the flash's, not a gateway's, and GCC computes 0xFFFFFFFF as intended. |
+
+The fuzzer stops at any other undefined behavior; it lets these two pass ([fuzz/smp/ubsan.supp](../../fuzz/smp/ubsan.supp)).
+
 ## Limits
 
 - **NVD lags.** Zephyr publishes advisories on GitHub before NVD analyzes them. This page covers what NVD lists, and the weekly check fails as NVD adds more. At the time of writing, Zephyr's advisories name flaws in 4.4.2 that are fixed only in 4.5.0, which isn't released yet, and NVD lists only a few of them so far.
