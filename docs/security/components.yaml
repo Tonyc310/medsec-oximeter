@@ -74,7 +74,7 @@ components:
     supplier: Nordic Semiconductor
     purl: pkg:github/NordicSemiconductor/nrfx@v4.2.0
     support: maintained, with no published end of support
-    advisories: https://www.nordicsemi.com/Products/Product-Security
+    advisories: https://docs.nordicsemi.com/r/bundle/struct_sa/page/struct/sa.html
 
   # Headers only. The CMSIS 6.2.0 development snapshot Zephyr pins carries CMSIS-Core 6.1.1.
   - name: cmsis-core
