@@ -352,6 +352,16 @@ Raises The Technical Alarm When The Sensor Stops
     Wait For Line On Uart     ALARM from oximeter: no pulse found    testerId=${hub}
     Wait For Line On Uart     hub: no reading    testerId=${hub}
 
+Notices A Silent Oximeter Within Two Seconds
+    Start System
+    Start Emulation
+    Wait For Line On Uart     link to the oximeter at security level 4    testerId=${hub}    timeout=10
+    # Silent sooner than 5 s into the link, before the oximeter would ask for its own timing.
+    Execute Command           mach set "oximeter"
+    Execute Command           cpu IsHalted true
+    # 420 ms of silence ends the link; the hub's log can trail it by up to a second.
+    Wait For Line On Uart     hub: disconnected (reason 0x08)    testerId=${hub}    timeout=2
+
 Recovers From A Hang Through The Watchdog
     Start System
     Monitor A Patient At 94 Percent

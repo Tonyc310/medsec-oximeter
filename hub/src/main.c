@@ -673,8 +673,10 @@ static void on_device_found(const bt_addr_le_t *addr, int8_t rssi, uint8_t type,
         return;
     }
 
+    /* 30-50 ms between connection events, and a supervision timeout of 420 ms rather than the
+     * default 4 s: the hub notices a silent oximeter within half a second. */
     const int err =
-        bt_conn_le_create(addr, BT_CONN_LE_CREATE_CONN, BT_LE_CONN_PARAM_DEFAULT, &oximeter);
+        bt_conn_le_create(addr, BT_CONN_LE_CREATE_CONN, BT_LE_CONN_PARAM(24, 40, 0, 42), &oximeter);
 
     if (err != 0) {
         LOG_ERR("connecting failed: %d", err);

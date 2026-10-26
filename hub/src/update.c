@@ -179,8 +179,9 @@ static int cmd_update(const struct shell *sh, size_t argc, char **argv)
     if (!ready(sh)) {
         return -ENOTCONN;
     }
-    /* The shortest connection interval while the image goes: about 20 s rather than 2 min. */
-    (void)bt_conn_le_param_update(oximeter, BT_LE_CONN_PARAM(6, 6, 0, 400));
+    /* The shortest connection interval while the image goes: about 20 s rather than 2 min. The
+     * supervision timeout stays at 420 ms. */
+    (void)bt_conn_le_param_update(oximeter, BT_LE_CONN_PARAM(6, 6, 0, 42));
 
     struct mcumgr_image_upload upload = {0};
 
