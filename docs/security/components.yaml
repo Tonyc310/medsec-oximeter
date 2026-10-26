@@ -1,0 +1,111 @@
+# Every component built into the oximeter's firmware, for its SBOM (tools/sbom.py).
+#
+# `module` is the Zephyr module west spdx finds a component's files in; `path`, for a component
+# inside a module, is where its files are. The toolchain's libraries, which west spdx doesn't
+# follow, name their `images` instead. Versions come from each project's own files: the west
+# manifest pins commits, not releases. `cpe` is the name NVD uses, where NVD has one; the rest are
+# matched by hand against their projects' advisories (docs/security/vulnerabilities.md).
+product: medsec-oximeter
+components:
+  - name: zephyr
+    type: operating-system
+    module: zephyr
+    version: 4.4.2
+    supplier: Zephyr Project
+    cpe: cpe:2.3:o:zephyrproject:zephyr:4.4.2:*:*:*:*:*:*:*
+    purl: pkg:github/zephyrproject-rtos/zephyr@v4.4.2
+    support: a regular release, maintained until 2027-04-12; the long-term support release is 3.7
+    end-of-support: 2027-04-12
+    advisories: https://github.com/zephyrproject-rtos/zephyr/security/advisories
+
+  - name: mbedtls
+    module: mbedtls
+    version: 4.1.0
+    supplier: Trusted Firmware (Mbed TLS project)
+    cpe: cpe:2.3:a:arm:mbed_tls:4.1.0:*:*:*:*:*:*:*
+    purl: pkg:github/Mbed-TLS/mbedtls@v4.1.0
+    support: long-term support release, maintained until March 2029; only its PSA Crypto side links
+    end-of-support: 2029-03
+    advisories: https://mbed-tls.readthedocs.io/en/latest/security-advisories/
+
+  # The module's own CPE says arm:tf-psa-crypto, a name NVD doesn't use.
+  - name: tf-psa-crypto
+    module: tf-psa-crypto
+    version: 1.1.0
+    supplier: Trusted Firmware (Mbed TLS project)
+    cpe: cpe:2.3:a:trustedfirmware:tf-psa-crypto:1.1.0:*:*:*:*:*:*:*
+    purl: pkg:github/Mbed-TLS/TF-PSA-Crypto@v1.1.0
+    support: long-term support release, maintained until March 2029
+    end-of-support: 2029-03
+    advisories: https://mbed-tls.readthedocs.io/en/latest/security-advisories/
+
+  - name: mcuboot
+    module: mcuboot
+    version: 2.4.0
+    supplier: MCUboot project
+    purl: pkg:github/mcu-tools/mcuboot@v2.4.0
+    support: maintained, with no published end of support; fixes come in later releases
+    advisories: https://github.com/mcu-tools/mcuboot/security/advisories
+
+  - name: tinycrypt
+    module: mcuboot
+    path: ext/tinycrypt/
+    version: 0.2.8
+    supplier: Intel
+    purl: pkg:github/intel/tinycrypt@v0.2.8
+    support: no longer maintained by Intel; MCUboot keeps its own copy
+    end-of-support: ended
+
+  # MCUboot's copy of Mbed TLS's ASN.1 parser, for signatures checked with TinyCrypt.
+  - name: mbedtls-asn1
+    module: mcuboot
+    path: ext/mbedtls-asn1/
+    version: 3.0.0
+    supplier: Trusted Firmware (Mbed TLS project)
+    cpe: cpe:2.3:a:arm:mbed_tls:3.0.0:*:*:*:*:*:*:*
+    purl: pkg:github/Mbed-TLS/mbedtls@v3.0.0
+    support: Mbed TLS 3.0 is long out of support; MCUboot maintains its copy
+    end-of-support: ended
+    advisories: https://mbed-tls.readthedocs.io/en/latest/security-advisories/
+
+  - name: nrfx
+    module: hal_nordic
+    version: 4.2.0
+    supplier: Nordic Semiconductor
+    purl: pkg:github/NordicSemiconductor/nrfx@v4.2.0
+    support: maintained, with no published end of support
+    advisories: https://www.nordicsemi.com/Products/Product-Security
+
+  # Headers only. The CMSIS 6.2.0 development snapshot Zephyr pins carries CMSIS-Core 6.1.1.
+  - name: cmsis-core
+    module: cmsis_6
+    version: 6.1.1
+    supplier: Arm
+    purl: pkg:github/ARM-software/CMSIS_6@v6.2.0-dev
+    support: maintained, with no published end of support
+    advisories: https://github.com/ARM-software/CMSIS_6/security
+
+  - name: zcbor
+    module: zcbor
+    version: 0.9.1
+    supplier: Nordic Semiconductor
+    purl: pkg:github/NordicSemiconductor/zcbor@0.9.1
+    support: maintained, with no published end of support
+    advisories: https://github.com/NordicSemiconductor/zcbor/security
+
+  # The C library and the compiler's runtime, from the Zephyr SDK 1.0.1 toolchain.
+  - name: picolibc
+    images: [app, mcuboot]
+    version: 1.8.10
+    supplier: picolibc project
+    purl: pkg:github/picolibc/picolibc@1.8.10
+    support: maintained, with no published end of support
+    advisories: https://github.com/picolibc/picolibc/security
+
+  - name: libgcc
+    images: [app, mcuboot]
+    version: 14.3.0
+    supplier: GNU Project
+    cpe: cpe:2.3:a:gnu:gcc:14.3.0:*:*:*:*:*:*:*
+    purl: pkg:generic/gcc@14.3.0
+    support: GCC 14 is maintained until its last point release
