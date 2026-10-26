@@ -1,0 +1,15 @@
+# Checks for the Python tools in tools/: PEP 8 and PEP 257 through ruff, at the C code's 100
+# columns; mypy in strict mode; pytest.
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "N", "D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.mypy]
+strict = true
+files = ["tools"]

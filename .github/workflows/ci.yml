@@ -16,6 +16,27 @@ jobs:
           app/src/*.[ch] app/tests/*/src/*.c hub/src/*.[ch] hub/tests/*/src/*.c common/include/*.h common/src/*.c
           core/include/*.h core/src/*.c tests/*.c
 
+  python:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install the checks
+        run: pip install ruff==0.17.2 mypy==2.4.0
+
+      # PEP 8 and PEP 257, per pyproject.toml.
+      - name: ruff
+        run: |
+          ruff check tools
+          ruff format --check tools
+
+      - name: mypy
+        run: mypy
+
   host:
     runs-on: ubuntu-24.04
     steps:

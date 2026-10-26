@@ -36,7 +36,7 @@ def hkdf_sha256(ikm: bytes, salt: bytes, info: bytes, length: int) -> bytes:
 
 
 def device_keys(signing_master: bytes, pairing_master: bytes, device_id: bytes) -> bytes:
-    """The keys of the oximeter with `device_id`, one after the other, as UICR holds them."""
+    """Return the keys of the oximeter with `device_id`, one after the other, as UICR holds them."""
     keys = [
         hkdf_sha256(signing_master, b"", label + device_id, KEY_SIZE) for label in SIGNING_LABELS
     ]
@@ -45,7 +45,7 @@ def device_keys(signing_master: bytes, pairing_master: bytes, device_id: bytes) 
 
 
 def uicr_words(keys: bytes) -> list[tuple[int, int]]:
-    """The (address, value) pairs that put `keys` in UICR, little-endian words."""
+    """Return the (address, value) pairs that put `keys` in UICR, as little-endian words."""
     return [
         (UICR_CUSTOMER + offset, int.from_bytes(keys[offset : offset + 4], "little"))
         for offset in range(0, len(keys), 4)
@@ -53,6 +53,7 @@ def uicr_words(keys: bytes) -> list[tuple[int, int]]:
 
 
 def read_hex(text: str, size: int, what: str) -> bytes:
+    """Return the `size` bytes `text` holds in hex, or exit naming `what`."""
     try:
         value = bytes.fromhex(text.strip())
     except ValueError:
@@ -63,6 +64,7 @@ def read_hex(text: str, size: int, what: str) -> bytes:
 
 
 def main() -> None:
+    """Write the UICR words for the keys, as a list or as a Renode script."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
         "--signing-master", type=Path, required=True, help="file holding the signing master, hex"
