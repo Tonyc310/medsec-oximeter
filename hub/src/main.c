@@ -744,10 +744,21 @@ static void on_security_changed(struct bt_conn *conn, bt_security_t level, enum 
     update_link_secured(conn);
 }
 
+/* The link's timing, in the units Bluetooth gives it: the interval in 1.25 ms steps, the
+ * supervision timeout in 10 ms steps. */
+static void on_param_updated(struct bt_conn *conn, uint16_t interval, uint16_t latency,
+                             uint16_t timeout)
+{
+    ARG_UNUSED(conn);
+    LOG_INF("link interval %u.%02u ms, latency %u, supervision timeout %u ms",
+            (interval * 125u) / 100u, (interval * 125u) % 100u, latency, timeout * 10u);
+}
+
 BT_CONN_CB_DEFINE(connection_callbacks) = {
     .connected = on_connected,
     .disconnected = on_disconnected,
     .security_changed = on_security_changed,
+    .le_param_updated = on_param_updated,
 };
 
 int main(void)

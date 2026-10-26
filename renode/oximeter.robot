@@ -215,6 +215,20 @@ Updates The Oximeter Over Bluetooth
     Wait For Line On Uart     image marked as working    testerId=${oximeter}    timeout=30
     Wait For Line On Uart     hub: SpO2 94%    testerId=${hub}    timeout=30
 
+Keeps The Fast Interval Through An Update
+    Sign A Release            1.1.0    ${TEST_IMAGES}/release-1.1.0.bin
+    Start System With An Update    ${TEST_IMAGES}/release-1.1.0.bin
+    Start Emulation
+    Wait For Line On Uart     ready to update the oximeter    testerId=${hub}    timeout=10
+    # Sooner than 5 s into the link, when Zephyr would have the oximeter ask for its own timing.
+    Write Line To Uart        update ${update_size}    testerId=${hub}
+    Wait For Line On Uart     link interval 7.50 ms    testerId=${hub}    timeout=120
+    # The hub's log waits for the upload to end: the next timing line would come before this one.
+    ${next}=                  Wait For Line On Uart    (link interval|the oximeter is restarting with the update)
+    ...                       testerId=${hub}    treatAsRegex=true    timeout=120
+    ${next}=                  Convert To String    ${next}
+    Should Contain            ${next}    the oximeter is restarting with the update
+
 Keeps An Update On Trial Whatever The Gateway Says
     Sign A Release            1.1.0    ${TEST_IMAGES}/release-1.1.0.bin
     Start System With An Update    ${TEST_IMAGES}/release-1.1.0.bin
