@@ -3,6 +3,10 @@ name: CI
 on:
   push:
   pull_request:
+  # Weekly, for the vulnerability check: CVEs published since the last build.
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
 
 jobs:
   format:
@@ -157,3 +161,25 @@ jobs:
         with:
           name: renode-results
           path: build/renode/
+
+  # Each CVE NVD lists for this build's SBOM needs a disposition in
+  # docs/security/vulnerabilities.md. Weekly and on demand only, since new CVEs arrive whether or
+  # not the code changes.
+  vulnerabilities:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: firmware
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: sbom
+          path: build
+
+      - name: Check every vulnerability has a disposition
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: >-
+          python3 tools/vulns.py --sbom build/medsec-oximeter.cdx.json
+          --assessment docs/security/vulnerabilities.md
