@@ -1,0 +1,18 @@
+# Each case reaches Zephyr as an interrupt, as in Zephyr's fuzzing sample.
+config ARCH_POSIX_FUZZ_IRQ
+	int "Interrupt that delivers each fuzz case"
+	default 31
+
+config ARCH_POSIX_FUZZ_TICKS
+	int "Ticks of simulated time each fuzz case gets"
+	default 2
+
+# MCUmgr's reassembly, which only its transports select; and a load offset, by which img_mgmt tells
+# the running slot, since native_sim has no code partition.
+config SMP_FUZZ
+	bool
+	default y
+	select MCUMGR_TRANSPORT_REASSEMBLY
+	select HAS_FLASH_LOAD_OFFSET
+
+source "Kconfig.zephyr"

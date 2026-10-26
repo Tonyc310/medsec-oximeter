@@ -1,4 +1,4 @@
-# Checks for the Python tools in tools/: PEP 8 and PEP 257 through ruff, at the C code's 100
+# Checks for the Python in tools/ and fuzz/: PEP 8 and PEP 257 through ruff, at the C code's 100
 # columns; mypy in strict mode; pytest.
 [tool.ruff]
 line-length = 100
@@ -16,7 +16,7 @@ convention = "pep257"
 
 [tool.mypy]
 strict = true
-files = ["tools"]
+files = ["tools", "fuzz"]
 
 [tool.pytest.ini_options]
 testpaths = ["tools/tests"]

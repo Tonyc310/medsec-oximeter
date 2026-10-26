@@ -1,0 +1,9 @@
+# Undefined behavior in Zephyr 4.4.2's MCUmgr, still on Zephyr's main branch. A gateway's bytes
+# can't steer either, and GCC builds both as intended for the nRF52840
+# (docs/security/vulnerabilities.md). Anything else fails the run.
+# zcbor_bulk calls each value's decoder through a function pointer of another type (CERT EXP37-C).
+function:zcbor_map_decode_bulk
+# ERASED_VAL_32 shifts the erased byte, 0xFF promoted to int, left by 24 (CERT INT34-C), in the
+# two functions that use it.
+shift-base:img_mgmt_read_info
+shift-base:img_mgmt_flash_check_empty_inner

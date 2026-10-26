@@ -138,10 +138,19 @@ west build -b native_sim/native/64 -d build/pairing_seal common/tests/pairing_se
 build/pairing_seal/zephyr/zephyr.exe
 ```
 
+The update protocol is fuzzed the same way, as a Zephyr program on the PC ([fuzz/smp](fuzz/smp)). libFuzzer sends any bytes at all as Bluetooth writes from the paired gateway, and MCUmgr handles them as the oximeter does, with its settings and its update guard, while an update runs on trial. Whatever arrives, the running image's slot never changes: a gateway can only stage an update in slot 1. The first cases are requests a gateway really sends, among them the confirm that standard update tools send once an update runs. UBSan stops at anything but two reports in Zephyr's MCUmgr, explained in [fuzz/smp/ubsan.supp](fuzz/smp/ubsan.supp). CI runs it for a minute; it needs clang:
+
+```bash
+ZEPHYR_TOOLCHAIN_VARIANT=host/llvm west build -b native_sim/native/64 -d build/smp_fuzz fuzz/smp
+python3 fuzz/smp/seeds.py build/smp_fuzz/seeds && mkdir -p build/smp_fuzz/corpus
+UBSAN_OPTIONS=halt_on_error=1:suppressions=fuzz/smp/ubsan.supp build/smp_fuzz/zephyr/zephyr.exe \
+    build/smp_fuzz/corpus build/smp_fuzz/seeds -dict=fuzz/smp/smp.dict -max_total_time=60
+```
+
 The Python tools follow PEP 8 and PEP 257, checked by ruff, and mypy checks their types strictly ([pyproject.toml](pyproject.toml)). The SBOM tool's tests check that it lists every component built into either image with its version and identifiers, and that it refuses one the curated list doesn't name. The vulnerability check's tests, with a stand-in for NVD, check that it passes when every CVE found has a disposition and names one that doesn't:
 
 ```bash
-ruff check tools && ruff format --check tools
+ruff check tools fuzz && ruff format --check tools fuzz
 mypy
 pytest
 ```
@@ -190,7 +199,7 @@ hub/            the stand-in gateway's Zephyr application, and tests for its sig
 common/         what the two applications share: Bluetooth and crypto definitions, crypto settings
 core/           the oximetry analysis, the PLX encoding, the alarm checks and signed limit changes: portable C17, no Zephyr
 tests/          Unity tests for core/, run on the host
-fuzz/           libFuzzer targets for core/'s parsers
+fuzz/           libFuzzer targets for core/'s parsers, and in smp/ for the update protocol on native_sim
 tools/          provision.py, the factory's step that puts an oximeter's keys into UICR; sbom.py, the SBOM of a build; vulns.py, the vulnerability check; tests/
 renode/         Renode platform, scripts, the MAX30101, flash controller, CCM and radio models, and the Robot tests
 docs/security/  the cybersecurity documentation for a premarket submission

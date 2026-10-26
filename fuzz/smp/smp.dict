@@ -1,0 +1,12 @@
+# The CBOR keys of the requests the oximeter takes, and an image header's magic number.
+off="\x63off"
+data="\x64data"
+len="\x63len"
+sha="\x63sha"
+image="\x65image"
+upgrade="\x67upgrade"
+hash="\x64hash"
+confirm="\x67confirm"
+slot="\x64slot"
+force="\x65force"
+image_magic="\x3d\xb8\xf3\x96"
