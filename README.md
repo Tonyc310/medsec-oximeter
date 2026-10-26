@@ -131,7 +131,7 @@ west build -b native_sim/native/64 -d build/pairing_seal common/tests/pairing_se
 build/pairing_seal/zephyr/zephyr.exe
 ```
 
-The Python tools follow PEP 8 and PEP 257, checked by ruff, and mypy checks their types strictly ([pyproject.toml](pyproject.toml)). The SBOM tool's tests check that it lists every component built into either image with its version and identifiers, and that it refuses one the curated list doesn't name:
+The Python tools follow PEP 8 and PEP 257, checked by ruff, and mypy checks their types strictly ([pyproject.toml](pyproject.toml)). The SBOM tool's tests check that it lists every component built into either image with its version and identifiers, and that it refuses one the curated list doesn't name. The vulnerability check's tests, with a stand-in for NVD, check that it passes when every CVE found has a disposition and names one that doesn't:
 
 ```bash
 ruff check tools && ruff format --check tools
@@ -183,7 +183,7 @@ hub/            the stand-in gateway's Zephyr application, and tests for its sig
 common/         what the two applications share: Bluetooth and crypto definitions, crypto settings
 core/           the oximetry analysis, the PLX encoding, the alarm checks and signed limit changes: portable C17, no Zephyr
 tests/          Unity tests for core/, run on the host
-tools/          provision.py, the factory's step that puts an oximeter's keys into UICR; sbom.py, the SBOM of a build; tests/
+tools/          provision.py, the factory's step that puts an oximeter's keys into UICR; sbom.py, the SBOM of a build; vulns.py, the vulnerability check; tests/
 renode/         Renode platform, scripts, the MAX30101, flash controller, CCM and radio models, and the Robot tests
 docs/security/  the cybersecurity documentation for a premarket submission
 deps/           Zephyr and its modules, fetched by west (git-ignored)
