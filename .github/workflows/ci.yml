@@ -117,6 +117,25 @@ jobs:
           west build -b nrf52840dk/nrf52840 -d build/flash-test deps/zephyr/tests/drivers/flash/common \
             -- -DCONFIG_TEST_FORCE_STORAGE_PARTITION=y
 
+      # From what each image compiled (west spdx), with docs/security/components.yaml's versions,
+      # identifiers and support: the SBOM of this exact build.
+      - name: SBOM
+        run: |
+          west spdx --analyze-includes -d build/oximeter/app
+          west spdx --analyze-includes -d build/oximeter/mcuboot
+          python3 tools/sbom.py --components docs/security/components.yaml --version-file app/VERSION \
+            --image app=build/oximeter/app/spdx --image mcuboot=build/oximeter/mcuboot/spdx \
+            --output build/medsec-oximeter.cdx.json
+
+      - name: Upload the SBOM
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom
+          path: |
+            build/medsec-oximeter.cdx.json
+            build/oximeter/app/spdx/
+            build/oximeter/mcuboot/spdx/
+
       - name: Install Renode
         run: |
           curl -fsSL "https://github.com/renode/renode/releases/download/v${RENODE_VERSION}/renode-${RENODE_VERSION}.linux-portable.tar.gz" \

@@ -10,3 +10,10 @@ if(NOT EXISTS ${release_key})
             --key ${release_key} --type ecdsa-p256
     COMMAND_ERROR_IS_FATAL ANY)
 endif()
+
+# The SBOM: west spdx reads what each image compiled through CMake's file-based API, which answers
+# only a query that's in place before the image is configured.
+foreach(image ${DEFAULT_IMAGE} mcuboot)
+  file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/${image}/.cmake/api/v1/query)
+  file(TOUCH ${CMAKE_BINARY_DIR}/${image}/.cmake/api/v1/query/codemodel-v2)
+endforeach()
