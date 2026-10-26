@@ -116,7 +116,7 @@ clang-tidy -p build/host core/src/*.c
 cppcheck --std=c11 --enable=warning,style,performance,portability -I core/include core/src
 ```
 
-libFuzzer gives the parsers of what other devices send any bytes at all, under the same sanitizers, and checks a property on every input. Whatever arrives as a limit change, the limits in force are the ones before or ones a monitor accepts, even with a MAC check that passes every tag, as a compromised backend key would. A reading the hub takes is in range, and one it refuses leaves the last reading as it was. CI runs each target for a minute. The fuzz build needs clang:
+libFuzzer gives the parsers of what other devices send any bytes at all, under the same sanitizers, and checks a property on every input. Whatever arrives as a limit change, the limits in force are the ones before or ones a monitor accepts, even with a MAC check that passes every tag, as a compromised backend key would. A reading the hub takes is in range, and one it refuses leaves the last reading as it was. A security log record the hub takes encodes back to the same bytes, so it shows the record the oximeter wrote. CI runs each target for a minute. The fuzz build needs clang:
 
 ```bash
 CC=clang cmake --workflow --preset fuzz
