@@ -6,9 +6,9 @@ How a software fix reaches the oximeter and the bedside gateway, end to end: fro
 
 ## Today
 
-There is no update path yet (T-32). The oximeter's firmware can only be changed through its SWD debug port (I-4), which is unlocked. MCUboot runs only an image signed with the release key, but through the unlocked port anyone can replace MCUboot too (T-14). The hub, the gateway's stand-in, has no MCUboot and no update path. Fixing a vulnerability would mean physically reaching every device.
+The last two hops are built and tested in simulation: the hub, standing in for the gateway, uploads a signed image to the oximeter over Bluetooth, and MCUboot checks it before it runs (hops 4 and 5, below). The hops from the manufacturer to the gateway, the backend and the Raspberry Pi gateway are planned. Until the debug port is locked, which only real hardware can show, anyone with a debug probe can still replace MCUboot itself (T-14).
 
-Everything below is the design Phase 4 builds. Each part says whether it exists yet.
+Each part below says whether it's done or planned. The [security controls](controls.md) it relies on are C-05, C-08, C-09, C-11, C-20 and C-21.
 
 ## Design in one paragraph
 
@@ -110,20 +110,20 @@ A compromised server or gateway can withhold or delay updates, a denial of servi
 |---|---|---|
 | Zephyr, pinned to v4.4.2 in `app/west.yml` | oximeter | move the pin to the patch release with the fix, rebuild, ship through the path above |
 | Zephyr's Bluetooth controller (`CONFIG_BT_LL_SW_SPLIT`) | oximeter | built into the same image, so controller fixes ship with the firmware: no separate radio firmware to update |
-| MCUboot | oximeter | MCUboot can't replace itself in this design. A bootloader fix needs physical access, so MCUboot is kept minimal and its configuration fixed. Its vulnerabilities are assessed like any other component's (Phase 5) |
+| MCUboot | oximeter | MCUboot can't replace itself in this design. A bootloader fix needs physical access, so MCUboot is kept minimal and its configuration fixed. Its vulnerabilities are assessed like any other component's ([vulnerability assessment](vulnerabilities.md)) |
 | TinyCrypt, MCUboot's own copy | oximeter, inside MCUboot | built into MCUboot, so a fix needs physical access, as MCUboot's does. It checks signatures instead of PSA Crypto, which the app uses: in MCUboot, PSA Crypto needs a random source, and with no threads for the nRF52840's random number generator driver it falls back to Zephyr's test-only generator. The original TinyCrypt project is no longer maintained, so MCUboot's copy is watched like MCUboot itself. Checking a signature handles no secret, so timing leaks don't apply to it |
 | Linux, Buildroot packages | gateway | Buildroot LTS patch releases, shipped as gateway bundles |
 
-FDA also asks manufacturers to keep everything needed to build and test a patch long after release. Here the build is fully pinned: the west manifest, the Zephyr SDK version and the CI configuration. The whole system also runs in Renode with no hardware, so a fix can be tested end to end on any machine years from now. The SBOM in Phase 5 lists every component, and the postmarket plan in Phase 7 covers monitoring them and how fast fixes ship. Security fixes ship as their own releases, not waiting for feature releases.
+FDA also asks manufacturers to keep everything needed to build and test a patch long after release. Here the build is fully pinned: the west manifest, the Zephyr SDK version and the CI configuration. The whole system also runs in Renode with no hardware, so a fix can be tested end to end on any machine years from now. The [SBOM](sbom.md) lists every component, CI checks it against NVD every week ([vulnerability assessment](vulnerabilities.md)), and the postmarket plan in Phase 7 covers how fast fixes ship. Security fixes ship as their own releases, not waiting for feature releases.
 
 ## Threats this view addresses
 
-| Threat | Today | After Phase 4 |
+| Threat | Phase 2 baseline | Now |
 |---|---|---|
-| T-14 Malicious firmware through the debug port | exploitable | debug port locked; MCUboot checks every boot |
-| T-17 A hang stops monitoring | exploitable | a watchdog resets the device, and a new image that hangs is reverted |
-| T-32 No field updates | exploitable | the path above |
-| T-33 Forged image | not yet built | signature checked on the device |
-| T-34 Rollback to a vulnerable image | not yet built | security counter, with the debug port locked |
-| T-35 Stolen release key | not yet built | key access controls; the single-key limitation above is assessed as residual risk |
-| T-36 Vulnerable third-party component | partly mitigated | everything above the bootloader can be updated; SBOM and monitoring in Phase 5 |
+| T-14 Malicious firmware through the debug port | exploitable | MCUboot checks every boot (C-08); the debug-port lock (C-11) is planned |
+| T-17 A hang stops monitoring | exploitable | a watchdog resets the oximeter, and an update that hangs is reverted (C-18, C-20) |
+| T-32 No field updates | exploitable | updates over Bluetooth from the paired gateway (C-20); the hops before the gateway are planned |
+| T-33 Forged image | not yet built | signature checked on the device (C-08, C-09) |
+| T-34 Rollback to a vulnerable image | not yet built | security counter (C-21), complete once the debug port is locked |
+| T-35 Stolen release key | not yet built | one key per checkout, never committed; the offline signing service is planned, and the single-key limitation above is residual risk |
+| T-36 Vulnerable third-party component | partly mitigated | everything above the bootloader can be updated; an SBOM from every build and a weekly vulnerability check (C-22) |
