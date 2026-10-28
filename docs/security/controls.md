@@ -217,13 +217,13 @@ Readings, limits and the log travel only over the encrypted link of C-01 and C-0
 
 ### C-20 Signed updates over Bluetooth, tried before they're kept
 
-**Requirement.** A fix reaches the oximeter in the field, through its paired gateway, and an update that doesn't work is undone without anyone touching the device.
+**Requirement.** A fix reaches the oximeter in the field, through its paired gateway, and an update that doesn't work is undone without anyone touching the device. The oximeter loses no sample while an update uploads, and monitors again within 30 s of restarting into it.
 
-**Built.** The gateway uploads a signed image with MCUmgr's SMP protocol over the authenticated link (C-04), marks it for a test boot and resets the oximeter ([hub/src/update.c](../../hub/src/update.c)). MCUboot checks it (C-08, C-21) and swaps it in, keeping the image before it. The update marks itself working only once its self-test passes; until then the next reset, by the watchdog if it hangs, swaps the previous image back. The security log shows the update marked for a test and the version that then started, so the backend sees whether it took. The [updatability view](updatability.md) has the whole path.
+**Built.** The gateway uploads a signed image with MCUmgr's SMP protocol over the authenticated link (C-04), marks it for a test boot and resets the oximeter ([hub/src/update.c](../../hub/src/update.c)). MCUboot checks it (C-08, C-21) and swaps it in, keeping the image before it. The update marks itself working only once its self-test passes; until then the next reset, by the watchdog if it hangs, swaps the previous image back. The security log shows the update marked for a test and the version that then started, so the backend sees whether it took. Each flash erase halts the processor for 85 ms, so at each interrupt the firmware reads every sample waiting in the sensor, and starts a new reading if the sensor ever lost some ([app/src/main.c](../../app/src/main.c), [core/src/sensor_fifo.c](../../core/src/sensor_fifo.c)). The [updatability view](updatability.md) has the whole path.
 
-**Verified by.** "Updates The Oximeter Over Bluetooth", "Keeps The Fast Interval Through An Update", "Takes Update Commands After Every Reconnection", "Keeps An Update That Passes Its Self-Test", "Reverts An Update That Fails Its Self-Test", "Logs An Update Marked For Test", "Logs The Version It Starts".
+**Verified by.** "Updates The Oximeter Over Bluetooth", "Keeps The Fast Interval Through An Update", "Takes Update Commands After Every Reconnection", "Keeps An Update That Passes Its Self-Test", "Reverts An Update That Fails Its Self-Test", "Logs An Update Marked For Test", "Logs The Version It Starts", "Loses No Sample During An Update", "Resumes Monitoring Soon After An Update", "Reads Every Sample Waiting In The Sensor", "Starts A New Reading After The Sensor Loses Samples"; the two tests of [tests/test_sensor_fifo.c](../../tests/test_sensor_fifo.c).
 
-**Limits.** Only the last hop, gateway to oximeter, is built; the hops from the manufacturer to the gateway are planned.
+**Limits.** Only the last hop, gateway to oximeter, is built; the hops from the manufacturer to the gateway are planned. The monitoring gap is measured in Renode, which times flash erases but not writes: about 5 s more on the chip.
 
 ### C-21 No rollback to an older release
 

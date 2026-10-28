@@ -25,6 +25,12 @@ ${UART}                     sysbus.uart0
 ${STAGING}                  0x82000
 ${SENSOR}                   sysbus.twi0.max30101
 ${ALARM_LED}                sysbus.gpio0.led0
+# Where the oximeter takes an update: slot 1, a sector in, as MCUboot's swap using offset wants it.
+${UPDATE_AREA}              0x83000
+${LAST_RELEASE}             ${CURDIR}/../build/oximeter/app/zephyr/zephyr.signed.bin
+# The longest monitoring may stop for an update, from the gateway's reset command to the first
+# reading after it: the gateway reports the pause, at a time the clinician approved.
+${MONITORING_GAP}           30
 
 *** Keywords ***
 Start System
@@ -51,6 +57,17 @@ Start System With An Update
     Set Test Variable         ${update_size}
     ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
     Set Test Variable         ${oximeter}
+
+Leave The Last Release In Slot 1
+    # Every update after the first finds the release before it where the new one goes.
+    Execute Command           mach set "oximeter"
+    Execute Command           sysbus LoadBinary @${LAST_RELEASE} ${UPDATE_AREA}
+
+Virtual Seconds
+    ${info}=                  Execute Command    emulation GetTimeSourceInfo
+    ${time}=                  Evaluate    re.search("Elapsed Virtual Time: ([0-9]+):([0-9]+):([0-9.]+)", $info)
+    ...                       modules=re
+    RETURN                    ${{3600 * int($time[1]) + 60 * int($time[2]) + float($time[3])}}
 
 Hold Button 1
     # Renode's GPIOTE misses a pin's first edge after Zephyr sets up its interrupt, so a tap first
@@ -228,6 +245,29 @@ Keeps The Fast Interval Through An Update
     ...                       testerId=${hub}    treatAsRegex=true    timeout=120
     ${next}=                  Convert To String    ${next}
     Should Contain            ${next}    the oximeter is restarting with the update
+
+Loses No Sample During An Update
+    Sign A Release            1.1.0    ${TEST_IMAGES}/release-1.1.0.bin
+    Start System With An Update    ${TEST_IMAGES}/release-1.1.0.bin
+    Leave The Last Release In Slot 1
+    Monitor A Patient At 94 Percent
+    ${before}=                Execute Command    ${SENSOR} LostSamples
+    Write Line To Uart        update ${update_size}    testerId=${hub}
+    # Up to the restart into the update, when monitoring stops anyway.
+    Wait For Line On Uart     Starting swap using offset algorithm    testerId=${oximeter}    timeout=120
+    ${after}=                 Execute Command    ${SENSOR} LostSamples
+    Should Be Equal As Integers    ${after}    ${before}
+
+Resumes Monitoring Soon After An Update
+    Sign A Release            1.1.0    ${TEST_IMAGES}/release-1.1.0.bin
+    Start System With An Update    ${TEST_IMAGES}/release-1.1.0.bin
+    Monitor A Patient At 94 Percent
+    Send The Update
+    ${restarted}=             Virtual Seconds
+    Wait For Line On Uart     connected to a pulse oximeter    testerId=${hub}    timeout=${MONITORING_GAP}
+    Wait For Line On Uart     hub: SpO2 94%    testerId=${hub}    timeout=${MONITORING_GAP}
+    ${resumed}=               Virtual Seconds
+    Should Be True            ${resumed} - ${restarted} < ${MONITORING_GAP}
 
 Keeps An Update On Trial Whatever The Gateway Says
     Sign A Release            1.1.0    ${TEST_IMAGES}/release-1.1.0.bin
