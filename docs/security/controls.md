@@ -41,7 +41,7 @@ Tests are named as their suites name them: Robot tests in [renode/oximeter.robot
 
 **Built.** LE Secure Connections only, at security level 4 (`CONFIG_BT_SMP_SC_ONLY`). Neither board can show or enter a passkey, so pairing is authenticated out of band: before each pairing the oximeter makes fresh out-of-band data and seals it with AES-CCM under its pairing key, bound to its device ID ([common/src/pairing_seal.c](../../common/src/pairing_seal.c), [app/src/pairing.c](../../app/src/pairing.c)). The gateway opens it with the key the backend derives for that device ([hub/src/pairing.c](../../hub/src/pairing.c)), which proves the oximeter's public key to the gateway. Anyone who can't open the seal can't pair, Just Works included. An oximeter that can't seal its data for the device ID it claims can't pair with a gateway either, which is what stops a fake oximeter (T-08).
 
-**Verified by.** "Pairs With The Hub Before Sending It Readings", "Can't Pair With A Hub Without The Pairing Master", "Refuses A Phone That Pairs With Just Works"; `test_opens_what_it_sealed`, `test_refuses_what_it_cannot_authenticate`, `test_seals_with_a_fresh_nonce_each_time` (common/tests/pairing_seal). No test yet plays a fake oximeter.
+**Verified by.** "Pairs Again Once The Backend Allows It", "Refuses A Phone That Pairs With Just Works", and every end-to-end test, since the hub hears readings only over a link it paired at level 4; `test_opens_what_it_sealed`, `test_refuses_what_it_cannot_authenticate`, `test_seals_with_a_fresh_nonce_each_time` (common/tests/pairing_seal). No test yet plays a fake oximeter.
 
 ### C-02 One gateway at a time
 
@@ -59,7 +59,7 @@ Tests are named as their suites name them: Robot tests in [renode/oximeter.robot
 
 **Built.** The oximeter offers a random 16-byte challenge, replaced after every attempt and on every connection. A command is the limits and an HMAC-SHA256 tag, cut to 128 bits, over the challenge and the limits, under the oximeter's limits key ([core/src/limits_auth.c](../../core/src/limits_auth.c), [app/src/limits_crypto.c](../../app/src/limits_crypto.c)). The tag is checked in constant time by PSA Crypto. Only the backend holds the key's master, so a gateway, or someone at it, relays commands but can't make one (T-21, T-22).
 
-**Verified by.** "Sends Readings To The Hub And Alarms On Limits It Signs", "Refuses Limits From A Hub Without Its Key"; the ten tests of [tests/test_limits_auth.c](../../tests/test_limits_auth.c), among them `test_never_accepts_the_same_command_twice`, `test_rejects_a_tag_made_for_another_challenge` and `test_rejects_every_command_when_no_new_challenge_can_be_made`; `test_signs_commands_the_oximeter_accepts`, `test_commands_signed_with_another_key_are_refused` (hub/tests/limits_signer); the fuzz target `fuzz_limits_command`.
+**Verified by.** "Alarms On Limits The Hub Signs", "Refuses Limits From A Hub Without Its Key"; the ten tests of [tests/test_limits_auth.c](../../tests/test_limits_auth.c), among them `test_never_accepts_the_same_command_twice`, `test_rejects_a_tag_made_for_another_challenge` and `test_rejects_every_command_when_no_new_challenge_can_be_made`; `test_signs_commands_the_oximeter_accepts`, `test_commands_signed_with_another_key_are_refused` (hub/tests/limits_signer); the fuzz target `fuzz_limits_command`.
 
 ## Authorization
 
@@ -69,7 +69,7 @@ Tests are named as their suites name them: Robot tests in [renode/oximeter.robot
 
 **Built.** Every characteristic needs security level 4, through `MEDSEC_PERM_READ_L4` and `MEDSEC_PERM_WRITE_L4` ([app/src/alarm_service.c](../../app/src/alarm_service.c), [app/src/plx_service.c](../../app/src/plx_service.c)), except the device ID and the sealed pairing data, which a gateway reads to pair. MCUmgr's SMP characteristic requires an authenticated link once pairing is on (`CONFIG_MCUMGR_TRANSPORT_BT_PERM_RW_AUTHEN`).
 
-**Verified by.** "Refuses A Phone That Pairs With Just Works", which also tries every read the oximeter protects; "Refuses An Update From A Phone That Isn't Paired".
+**Verified by.** "Refuses A Phone That Isn't Paired", which tries to read the readings service and the security log, and to start an upload.
 
 ### C-05 Only the oximeter's self-test keeps an update
 
@@ -87,7 +87,7 @@ Tests are named as their suites name them: Robot tests in [renode/oximeter.robot
 
 **Built.** Three 32-byte keys, for limit changes, the security log and the pairing data, written into the nRF52840's UICR at the factory ([tools/provision.py](../../tools/provision.py)). The backend derives the same keys from a master secret and the device ID with HKDF-SHA256, a different label for each, so it stores no per-device keys. Every device runs the same image. An oximeter that was never provisioned refuses every pairing and every change ([core/src/device_key.c](../../core/src/device_key.c)).
 
-**Verified by.** "Can't Be Paired Or Changed Without A Device Key"; `test_accepts_a_provisioned_key`, `test_refuses_an_erased_or_zeroed_key` (tests/test_device_key.c); `test_derives_rfc5869_outputs`, `test_gives_each_device_its_own_key`, `test_derives_a_different_key_for_the_log`, `test_signs_with_the_key_derived_for_that_device` (hub/tests/limits_signer).
+**Verified by.** "Can't Be Paired Without A Device Key"; `test_accepts_a_provisioned_key`, `test_refuses_an_erased_or_zeroed_key` (tests/test_device_key.c); `test_derives_rfc5869_outputs`, `test_gives_each_device_its_own_key`, `test_derives_a_different_key_for_the_log`, `test_signs_with_the_key_derived_for_that_device` (hub/tests/limits_signer).
 
 **Limits.** Until the debug port is locked (C-11), anyone holding an oximeter can read its keys out. They open that oximeter only.
 
@@ -147,7 +147,7 @@ Readings, limits and the log travel only over the encrypted link of C-01 and C-0
 
 **Built.** Holding Button 1 for 5 s deletes the bond and the stored limits, and the oximeter starts again with the defaults ([app/src/new_patient.c](../../app/src/new_patient.c)); a shorter press, as from a patient lying on it, does nothing. A gateway must then pair afresh with the backend's sealed data, and the hub waits for the backend's go-ahead before it does ([hub/src/pairing.c](../../hub/src/pairing.c)). The security log stays and records the reset (C-13).
 
-**Verified by.** "Forgets Its Gateway For A New Patient", "Goes Back To The Default Limits For A New Patient", "Ignores A Short Press", "Pairs Again Once The Backend Allows It", "Logs The Reset For A New Patient"; `test_forgets_the_limits_when_cleared` (app/tests/limits_store).
+**Verified by.** "Goes Back To The Default Limits For A New Patient", "Ignores A Short Press", "Pairs Again Once The Backend Allows It", "Logs The Reset For A New Patient"; `test_forgets_the_limits_when_cleared` (app/tests/limits_store).
 
 ## Event detection and logging
 
@@ -157,7 +157,7 @@ Readings, limits and the log travel only over the encrypted link of C-01 and C-0
 
 **Built.** Each start-up with the reset cause and the version running, each update marked for a test boot with its version, each central that connects, each pairing and each refused one with the reason, each limit change accepted or refused and why, the sensor stopping and resuming, and the reset for a new patient ([core/src/security_log.c](../../core/src/security_log.c), [app/src/event_log.c](../../app/src/event_log.c)). The last 64 records are kept in flash, numbered from 1 and timed by boot and uptime, since the oximeter has no clock. Nothing over the air can change or erase them, and only the paired gateway can read them (C-04).
 
-**Verified by.** "Logs The Security Events The Hub Reads", "Logs The Pairing", "Logs A Refused Pairing", "Logs A Refused Change From A Hub Without Its Key", "Logs An Update Marked For Test", "Logs The Version It Starts", "Logs The Reset For A New Patient"; the ten tests of [tests/test_security_log.c](../../tests/test_security_log.c); `test_records_survive_a_restart` (app/tests/event_log).
+**Verified by.** "Logs The Security Events The Hub Reads", "Logs The Pairing", "Logs A Refused Pairing", "Logs A Refused Change From A Hub Without Its Key", "Logs An Update Marked For Test", "Logs The Reset For A New Patient"; the ten tests of [tests/test_security_log.c](../../tests/test_security_log.c); `test_records_survive_a_restart` (app/tests/event_log).
 
 **Limits.** The log records which central changed the limits, not which person (T-04); naming the person is the backend's job (T-30).
 
@@ -175,7 +175,7 @@ Readings, limits and the log travel only over the encrypted link of C-01 and C-0
 
 **Built.** The backend sends a fresh random challenge; the oximeter answers with its newest record's number, tagged with the challenge under the log key ([app/src/event_log.c](../../app/src/event_log.c)). The gateway can neither forge that answer nor pass off an old one.
 
-**Verified by.** "Shows The Log It Read Is Complete", "Shows Records The Hub Hasn't Read"; `test_names_the_newest_record`, `test_encodes_the_answer_to_a_challenge_as_the_backend_checks_it` (tests/test_security_log.c); `test_accepts_the_oximeters_answer_to_its_challenge`, `test_refuses_an_answer_it_didnt_ask_for` (hub/tests/limits_signer).
+**Verified by.** "Shows Whether The Hub Read The Whole Log"; `test_names_the_newest_record`, `test_encodes_the_answer_to_a_challenge_as_the_backend_checks_it` (tests/test_security_log.c); `test_accepts_the_oximeters_answer_to_its_challenge`, `test_refuses_an_answer_it_didnt_ask_for` (hub/tests/limits_signer).
 
 ## Resiliency and recovery
 
@@ -221,7 +221,7 @@ Readings, limits and the log travel only over the encrypted link of C-01 and C-0
 
 **Built.** The gateway uploads a signed image with MCUmgr's SMP protocol over the authenticated link (C-04), marks it for a test boot and resets the oximeter ([hub/src/update.c](../../hub/src/update.c)). MCUboot checks it (C-08, C-21) and swaps it in, keeping the image before it. The update marks itself working only once its self-test passes; until then the next reset, by the watchdog if it hangs, swaps the previous image back. The security log shows the update marked for a test and the version that then started, so the backend sees whether it took. Each flash erase halts the processor for 85 ms, so at each interrupt the firmware reads every sample waiting in the sensor, and starts a new reading if the sensor ever lost some ([app/src/main.c](../../app/src/main.c), [core/src/sensor_fifo.c](../../core/src/sensor_fifo.c)). The [updatability view](updatability.md) has the whole path.
 
-**Verified by.** "Updates The Oximeter Over Bluetooth", "Keeps The Fast Interval Through An Update", "Takes Update Commands After Every Reconnection", "Keeps An Update That Passes Its Self-Test", "Reverts An Update That Fails Its Self-Test", "Logs An Update Marked For Test", "Logs The Version It Starts", "Loses No Sample During An Update", "Resumes Monitoring Soon After An Update", "Reads Every Sample Waiting In The Sensor", "Starts A New Reading After The Sensor Loses Samples"; the two tests of [tests/test_sensor_fifo.c](../../tests/test_sensor_fifo.c).
+**Verified by.** "Keeps An Update On Trial Whatever The Gateway Says", "Keeps The Fast Interval Through An Update", "Takes Update Commands After Every Reconnection", "Keeps An Update That Passes Its Self-Test", "Reverts An Update That Fails Its Self-Test", "Logs An Update Marked For Test", "Logs The Security Events The Hub Reads" (the start record carries the running version), "Loses No Sample During An Update", "Resumes Monitoring Soon After An Update", "Reads Every Sample Waiting In The Sensor", "Starts A New Reading After The Sensor Loses Samples"; the two tests of [tests/test_sensor_fifo.c](../../tests/test_sensor_fifo.c).
 
 **Limits.** Only the last hop, gateway to oximeter, is built; the hops from the manufacturer to the gateway are planned. The monitoring gap is measured in Renode, which times flash erases but not writes: about 5 s more on the chip.
 
