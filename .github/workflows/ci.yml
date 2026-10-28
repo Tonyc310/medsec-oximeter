@@ -160,6 +160,15 @@ jobs:
           west build -b nrf52840dk/nrf52840 -d build/flash-test deps/zephyr/tests/drivers/flash/common \
             -- -DCONFIG_TEST_FORCE_STORAGE_PARTITION=y
 
+      # The masters the hub build made, the release key, and the keys of the oximeter the Renode
+      # tests provision: none may be in the oximeter's image or MCUboot's.
+      - name: Check no key is built in
+        run: >-
+          python3 tools/find_keys.py --signing-master build/signing-master.key
+          --pairing-master build/pairing-master.key --release-key build/release-key.pem
+          --device-id 0123456789abcdef
+          build/oximeter/app/zephyr/zephyr.signed.bin build/oximeter/mcuboot/zephyr/zephyr.bin
+
       # From what each image compiled (west spdx), with docs/security/components.yaml's versions,
       # identifiers and support: the SBOM of this exact build.
       - name: SBOM

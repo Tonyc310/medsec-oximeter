@@ -87,7 +87,7 @@ Tests are named as their suites name them: Robot tests in [renode/oximeter.robot
 
 **Built.** Three 32-byte keys, for limit changes, the security log and the pairing data, written into the nRF52840's UICR at the factory ([tools/provision.py](../../tools/provision.py)). The backend derives the same keys from a master secret and the device ID with HKDF-SHA256, a different label for each, so it stores no per-device keys. Every device runs the same image. An oximeter that was never provisioned refuses every pairing and every change ([core/src/device_key.c](../../core/src/device_key.c)).
 
-**Verified by.** "Can't Be Paired Without A Device Key"; `test_accepts_a_provisioned_key`, `test_refuses_an_erased_or_zeroed_key` (tests/test_device_key.c); `test_derives_rfc5869_outputs`, `test_gives_each_device_its_own_key`, `test_derives_a_different_key_for_the_log`, `test_signs_with_the_key_derived_for_that_device` (hub/tests/limits_signer).
+**Verified by.** "Can't Be Paired Without A Device Key"; `test_accepts_a_provisioned_key`, `test_refuses_an_erased_or_zeroed_key` (tests/test_device_key.c); `test_derives_rfc5869_outputs`, `test_gives_each_device_its_own_key`, `test_derives_a_different_key_for_the_log`, `test_signs_with_the_key_derived_for_that_device` (hub/tests/limits_signer); the key check ([tools/find_keys.py](../../tools/find_keys.py)), which finds neither master nor any of a provisioned oximeter's keys in the oximeter's image or MCUboot's.
 
 **Limits.** Until the debug port is locked (C-11), anyone holding an oximeter can read its keys out. They open that oximeter only.
 
@@ -107,7 +107,7 @@ Tests are named as their suites name them: Robot tests in [renode/oximeter.robot
 
 **Built.** MCUboot checks an ECDSA P-256 signature over the image and its header at every boot, not only after an update (`BOOT_VALIDATE_SLOT0`), with the public half of the release key built into it. The build makes the release key on its first run and never commits it ([app/sysbuild.cmake](../../app/sysbuild.cmake)), so MCUboot's published development key, sysbuild's default, is never trusted.
 
-**Verified by.** "Never Starts An Image The Release Key Didn't Sign", with an image signed with MCUboot's published key and one changed after signing; "Erases An Update With Anything The Release Key Didn't Sign", with an unsigned update.
+**Verified by.** "Never Starts An Image The Release Key Didn't Sign", with an image signed with MCUboot's published key and one changed after signing; "Erases An Update With Anything The Release Key Didn't Sign", with an unsigned update; the key check (C-06), which finds the release key's private half in neither image.
 
 **Limits.** Through the debug port, until it's locked (C-11), anyone can replace MCUboot itself. The release key is one per checkout here; a product keeps it in an offline signing service (T-35), and since MCUboot can't be updated, replacing a compromised key needs every device in hand.
 
