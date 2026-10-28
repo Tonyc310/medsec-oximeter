@@ -62,10 +62,13 @@ jobs:
       - name: clang-tidy
         run: clang-tidy -p build/host core/src/*.c
 
+      # app/ and common/ without Zephyr's headers: cppcheck can't expand Zephyr's devicetree
+      # macros, so it checks their code without following Zephyr's types.
       - name: cppcheck
         run: >-
           cppcheck --std=c11 --enable=warning,style,performance,portability --inline-suppr
-          --error-exitcode=1 -q -I core/include core/src
+          --error-exitcode=1 -q -I core/include -I common/include -I app/src
+          core/src app/src common/src
 
   # libFuzzer on core/'s parsers of what other devices send, a minute each. Each run starts from
   # nothing: the inputs are a few bytes long, so the fuzzer finds their shape within seconds.

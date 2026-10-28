@@ -33,7 +33,9 @@ static void reset_for_new_patient(struct k_work *work)
 
 static K_WORK_DEFINE(reset_work, reset_for_new_patient);
 
-/* The overlay's long press reports Delete: the code only names the event. */
+/* The overlay's long press reports Delete: the code only names the event. Zephyr's callback type
+ * gives the event as non-const. */
+/* cppcheck-suppress constParameterCallback */
 static void on_input(struct input_event *event, void *user_data)
 {
     ARG_UNUSED(user_data);

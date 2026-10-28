@@ -108,14 +108,14 @@ In the hub's window, `limits <SpO2 low %> <pulse low bpm> <pulse high bpm>` sets
 
 ## Test
 
-The code is C17 written to SEI CERT C and formatted by clang-format 23.1.2 ([.clang-format](.clang-format)). The host build of `core/` runs its unit tests under AddressSanitizer and UndefinedBehaviorSanitizer with strict conversion warnings, then two static analyzers check it: clang-tidy (its CERT C checks, the Clang static analyzer and bug-prone patterns, per [.clang-tidy](.clang-tidy)) and cppcheck. CI runs the versions Ubuntu 24.04 gives, clang-tidy 18 and cppcheck 2.13.
+The code is C17 written to SEI CERT C and formatted by clang-format 23.1.2 ([.clang-format](.clang-format)). The host build of `core/` runs its unit tests under AddressSanitizer and UndefinedBehaviorSanitizer with strict conversion warnings, then two static analyzers check it: clang-tidy (its CERT C checks, the Clang static analyzer and bug-prone patterns, per [.clang-tidy](.clang-tidy)) and cppcheck. cppcheck also checks the firmware's code in `app/` and `common/`. It runs there without Zephyr's headers, whose devicetree macros it can't expand, so it doesn't follow Zephyr's types. CI runs the versions Ubuntu 24.04 gives, clang-tidy 18 and cppcheck 2.13.
 
 ```bash
 git ls-files '*.[ch]' | xargs clang-format --dry-run --Werror
 cmake --workflow --preset host                 # unit tests, sanitized
 clang-tidy -p build/host core/src/*.c
 cppcheck --std=c11 --enable=warning,style,performance,portability --inline-suppr \
-    --error-exitcode=1 -q -I core/include core/src
+    --error-exitcode=1 -q -I core/include -I common/include -I app/src core/src app/src common/src
 ```
 
 libFuzzer gives the parsers of what other devices send any bytes at all, under the same sanitizers, and checks a property on every input. Whatever arrives as a limit change, the limits in force are the ones before or ones a monitor accepts, even with a MAC check that passes every tag, as a compromised backend key would. A reading the hub takes is in range, and one it refuses leaves the last reading as it was. A security log record the hub takes encodes back to the same bytes, so it shows the record the oximeter wrote. CI runs each target for a minute. The fuzz build needs clang:

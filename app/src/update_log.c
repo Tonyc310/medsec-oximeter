@@ -38,14 +38,14 @@ static enum mgmt_cb_return on_command(uint32_t event, enum mgmt_cb_return prev_s
                                       uint16_t *group, bool *abort_more, void *data,
                                       size_t data_size)
 {
-    const struct mgmt_evt_op_cmd_arg *command = data;
-
     ARG_UNUSED(prev_status);
     ARG_UNUSED(rc);
     ARG_UNUSED(group);
     ARG_UNUSED(abort_more);
     ARG_UNUSED(data_size);
     if (event == MGMT_EVT_OP_CMD_RECV) {
+        const struct mgmt_evt_op_cmd_arg *command = data;
+
         state_write = (command->group == MGMT_GROUP_ID_IMAGE) &&
                       (command->id == IMG_MGMT_ID_STATE) && (command->op == MGMT_OP_WRITE);
     } else if (state_write && (mcuboot_swap_type() == BOOT_SWAP_TYPE_TEST)) {
