@@ -59,7 +59,7 @@ Tests are named as their suites name them: Robot tests in [renode/oximeter.robot
 
 **Built.** The oximeter offers a random 16-byte challenge, replaced after every attempt and on every connection. A command is the limits and an HMAC-SHA256 tag, cut to 128 bits, over the challenge and the limits, under the oximeter's limits key ([core/src/limits_auth.c](../../core/src/limits_auth.c), [app/src/limits_crypto.c](../../app/src/limits_crypto.c)). The tag is checked in constant time by PSA Crypto. Only the backend holds the key's master, so a gateway, or someone at it, relays commands but can't make one (T-21, T-22).
 
-**Verified by.** "Sends Readings To The Hub And Alarms On Limits It Signs", "Refuses Limits From A Hub Without Its Key"; the eleven tests of [tests/test_limits_auth.c](../../tests/test_limits_auth.c), among them `test_never_accepts_the_same_command_twice`, `test_rejects_a_tag_made_for_another_challenge` and `test_rejects_every_command_when_no_new_challenge_can_be_made`; `test_signs_commands_the_oximeter_accepts`, `test_commands_signed_with_another_key_are_refused` (hub/tests/limits_signer); the fuzz target `fuzz_limits_command`.
+**Verified by.** "Sends Readings To The Hub And Alarms On Limits It Signs", "Refuses Limits From A Hub Without Its Key"; the ten tests of [tests/test_limits_auth.c](../../tests/test_limits_auth.c), among them `test_never_accepts_the_same_command_twice`, `test_rejects_a_tag_made_for_another_challenge` and `test_rejects_every_command_when_no_new_challenge_can_be_made`; `test_signs_commands_the_oximeter_accepts`, `test_commands_signed_with_another_key_are_refused` (hub/tests/limits_signer); the fuzz target `fuzz_limits_command`.
 
 ## Authorization
 

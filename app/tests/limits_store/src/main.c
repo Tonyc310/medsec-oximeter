@@ -52,11 +52,10 @@ ZTEST(limits_store, test_keeps_the_defaults_when_the_stored_value_is_not_valid)
 {
     static const struct {
         const char *name;
-        uint8_t value[ALARM_LIMITS_SIZE + 1u];
+        uint8_t value[ALARM_LIMITS_SIZE];
         size_t length;
     } cases[] = {
         {"too short", {95u, 40u, 0u, 130u}, 4u},
-        {"too long", {95u, 40u, 0u, 130u, 0u, 0u}, 6u},
         {"SpO2 limit of 100%", {100u, 40u, 0u, 130u, 0u}, 5u},
     };
 

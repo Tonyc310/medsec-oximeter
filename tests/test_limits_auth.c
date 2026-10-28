@@ -88,11 +88,6 @@ static void sign(const uint8_t limits_bytes[ALARM_LIMITS_SIZE],
 static void test_takes_each_challenge_from_the_random_source(void)
 {
     expect_challenge(0x10u);
-}
-
-/* The app asks for one on every connection, so a command made on an earlier connection is stale. */
-static void test_issues_a_new_challenge_on_request(void)
-{
     limits_auth_new_challenge(&auth);
     expect_challenge(0x20u);
 }
@@ -119,6 +114,7 @@ static void test_rejects_a_tag_made_over_different_limits(void)
                           limits_auth_apply(&auth, command, sizeof command, &limits));
 }
 
+/* The app asks for one on every connection, so a command made on an earlier connection is stale. */
 static void test_rejects_a_tag_made_for_another_challenge(void)
 {
     uint8_t command[LIMITS_AUTH_COMMAND_SIZE];
@@ -208,7 +204,6 @@ int main(void)
 {
     UNITY_BEGIN();
     RUN_TEST(test_takes_each_challenge_from_the_random_source);
-    RUN_TEST(test_issues_a_new_challenge_on_request);
     RUN_TEST(test_accepts_limits_signed_over_the_current_challenge);
     RUN_TEST(test_rejects_a_tag_made_over_different_limits);
     RUN_TEST(test_rejects_a_tag_made_for_another_challenge);
