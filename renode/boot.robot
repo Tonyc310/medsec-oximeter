@@ -19,7 +19,8 @@ Load The Oximeter
     Execute Command           $oximeter_image=@${image}
     Execute Command           $provisioning=@${UNPROVISIONED}
     Execute Script            ${SCRIPT}
-    ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter    timeout=5
+    # At 85 ms a page, MCUboot takes about 10 s to swap an update in or erase one it refuses.
+    ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter    timeout=30
     Set Test Variable         ${oximeter}
 
 Load The Update

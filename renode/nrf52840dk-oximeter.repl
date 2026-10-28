@@ -4,9 +4,11 @@ using "nrf52840dk.repl"
 max30101: Sensors.MAX30101 @ twi0 0x57
     IRQ -> gpio1@3
 
-// Renode has no model of the flash controller: Nvmc.cs adds one.
+// Renode has no model of the flash controller: Nvmc.cs adds one, which halts the CPU while it
+// erases.
 nvmc: Miscellaneous.NRF52840_NVMC @ sysbus 0x4001E000
     flash: flash
+    cpu: cpu
 
 // Nor of the CCM, which encrypts and decrypts Bluetooth packets: Ccm.cs adds one.
 ccm: Miscellaneous.NRF52840_CCM @ sysbus 0x4000F000

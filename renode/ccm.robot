@@ -1,3 +1,6 @@
+*** Settings ***
+Resource                    platform.resource
+
 *** Variables ***
 ${CCM}                      sysbus.ccm
 # RAM the tests give the CCM for its configuration and packets: no firmware runs.
@@ -10,14 +13,6 @@ ${SESSION_KEY}              99ad1b5226a37e3e058e3b8e27c2c666
 ${IV}                       24abdcbabebaafde
 
 *** Keywords ***
-Create The Platform
-    Execute Command           include @${CURDIR}/Max30101.cs
-    Execute Command           include @${CURDIR}/Nvmc.cs
-    Execute Command           include @${CURDIR}/Ccm.cs
-    Execute Command           include @${CURDIR}/Radio.cs
-    Execute Command           mach create
-    Execute Command           machine LoadPlatformDescription @${CURDIR}/nrf52840dk-oximeter.repl
-
 Write Hex
     [Arguments]               ${address}    ${hex}
     ${bytes}=                 Evaluate    "[" + ", ".join(hex(b) for b in bytes.fromhex($hex)) + "]"
