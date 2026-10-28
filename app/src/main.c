@@ -109,6 +109,12 @@ static void on_sample(const struct device *dev, const struct sensor_trigger *tri
     for (uint32_t waiting = sensor_fifo_waiting(fifo); waiting > 0u; waiting--) {
         take_sample(dev);
     }
+    /* A full FIFO keeps its oldest samples, so the ones it lost came after those just read: a new
+     * window starts here rather than one analysed across the gap. */
+    if (fifo.overflow != 0u) {
+        LOG_WRN("the sensor lost samples; starting a new reading");
+        oximetry_init(&oximetry);
+    }
 }
 
 /* With no samples there's nothing to measure, so a stopped sensor reads as no reading: the

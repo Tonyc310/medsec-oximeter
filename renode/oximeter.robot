@@ -355,6 +355,23 @@ Reads Every Sample Waiting In The Sensor
     ${waiting}=               Convert To Integer    ${waiting.strip()}
     Should Be True            ${waiting} <= 1
 
+Starts A New Reading After The Sensor Loses Samples
+    Start System
+    Monitor A Patient At 94 Percent
+    ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
+    # 400 ms without an interrupt, longer than the sensor's FIFO lasts (320 ms): it loses samples,
+    # and a reading across the gap would be skewed.
+    Execute Command           pause
+    Execute Command           ${SENSOR} InterruptCut true
+    Execute Command           emulation RunFor "0.4"
+    Execute Command           ${SENSOR} InterruptCut false
+    Start Emulation
+    Wait For Line On Uart     the sensor lost samples; starting a new reading    testerId=${oximeter}    timeout=2
+    # The next reading waits for four seconds of samples after the gap; log lines can trail by up
+    # to a second.
+    Should Not Be On Uart     SpO2    testerId=${oximeter}    timeout=2.5
+    Wait For Line On Uart     SpO2 94%    testerId=${oximeter}    timeout=3
+
 Raises The Technical Alarm When The Sensor Stops
     Start System
     Monitor A Patient At 94 Percent
