@@ -57,31 +57,53 @@ Add A Security Counter Outside The Signature
     Execute Command           sysbus WriteDoubleWord ${field + 4} ${counter}
     Execute Command           sysbus WriteWord ${unsigned + 2} ${total + 8}
 
-*** Test Cases ***
-Boots The Signed Oximeter Through MCUboot
-    Load The Oximeter
-    Start Emulation
-    Wait For Line On Uart     Booting MCUboot    testerId=${oximeter}
-    # The version MCUboot checked, read back from the image's signed header.
-    Wait For Line On Uart     medsec-oximeter 1.0.0+0 started    testerId=${oximeter}
-
-Refuses An Image Signed With MCUboot's Published Key
+Load An Image Signed With MCUboot's Published Key
     Sign The Oximeter         ${PUBLISHED_KEY}    ${TEST_IMAGES}/published-key.hex
     Load The Oximeter         ${TEST_IMAGES}/published-key.hex
-    Start Emulation
-    Wait For Line On Uart     Unable to find bootable image    testerId=${oximeter}
-    Should Not Be On Uart     medsec-oximeter    testerId=${oximeter}    timeout=3
 
-Refuses An Image Changed After Signing
+Load An Image Changed After Signing
     Load The Oximeter
     # One byte of the program flipped, as by someone rewriting the flash.
     Execute Command           mach set "oximeter"
     ${byte}=                  Execute Command    sysbus ReadByte ${PROGRAM_BYTE}
     ${flipped}=               Evaluate    int($byte.strip(), 16) ^ 0xFF
     Execute Command           sysbus WriteByte ${PROGRAM_BYTE} ${flipped}
+
+Load An Unsigned Update
+    # Hashed, so MCUboot can tell it's intact, but signed by no one.
+    Sign An Update            1.1.0    1    ${TEST_IMAGES}/unsigned-update.hex    key=${EMPTY}
+    Load The Oximeter
+    Load The Update           ${TEST_IMAGES}/unsigned-update.hex
+
+Load An Update With A Field Added Outside Its Signature
+    # A genuine update, given a higher security counter where the signature doesn't reach, as
+    # CVE-2024-32883 describes.
+    Sign An Update            1.1.0    1    ${TEST_IMAGES}/update.hex
+    Load The Oximeter
+    Load The Update           ${TEST_IMAGES}/update.hex
+    Add A Security Counter Outside The Signature    99
+
+Should Never Start
+    [Arguments]               ${load}
+    Reset Emulation
+    Run Keyword               ${load}
     Start Emulation
     Wait For Line On Uart     Unable to find bootable image    testerId=${oximeter}
     Should Not Be On Uart     medsec-oximeter    testerId=${oximeter}    timeout=3
+
+Should Erase The Update
+    [Arguments]               ${load}
+    Reset Emulation
+    Run Keyword               ${load}
+    Start Emulation
+    Wait For Line On Uart     Image in the secondary slot is not valid    testerId=${oximeter}
+    Wait For Line On Uart     medsec-oximeter 1.0.0+0 started    testerId=${oximeter}
+
+*** Test Cases ***
+Never Starts An Image The Release Key Didn't Sign
+    [Template]                Should Never Start
+    Load An Image Signed With MCUboot's Published Key
+    Load An Image Changed After Signing
 
 Keeps An Update That Passes Its Self-Test
     Sign An Update            1.1.0    1    ${TEST_IMAGES}/update.hex
@@ -115,22 +137,7 @@ Refuses An Older Release
     Wait For Line On Uart     erased due to downgrade prevention    testerId=${oximeter}
     Wait For Line On Uart     medsec-oximeter 1.0.0+0 started    testerId=${oximeter}
 
-Refuses An Unsigned Update
-    # Hashed, so MCUboot can tell it's intact, but signed by no one.
-    Sign An Update            1.1.0    1    ${TEST_IMAGES}/unsigned-update.hex    key=${EMPTY}
-    Load The Oximeter
-    Load The Update           ${TEST_IMAGES}/unsigned-update.hex
-    Start Emulation
-    Wait For Line On Uart     Image in the secondary slot is not valid    testerId=${oximeter}
-    Wait For Line On Uart     medsec-oximeter 1.0.0+0 started    testerId=${oximeter}
-
-Refuses An Update With A Field Added Outside Its Signature
-    # A genuine update, given a higher security counter where the signature doesn't reach, as
-    # CVE-2024-32883 describes.
-    Sign An Update            1.1.0    1    ${TEST_IMAGES}/update.hex
-    Load The Oximeter
-    Load The Update           ${TEST_IMAGES}/update.hex
-    Add A Security Counter Outside The Signature    99
-    Start Emulation
-    Wait For Line On Uart     Image in the secondary slot is not valid    testerId=${oximeter}
-    Wait For Line On Uart     medsec-oximeter 1.0.0+0 started    testerId=${oximeter}
+Erases An Update With Anything The Release Key Didn't Sign
+    [Template]                Should Erase The Update
+    Load An Unsigned Update
+    Load An Update With A Field Added Outside Its Signature

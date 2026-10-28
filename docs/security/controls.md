@@ -107,7 +107,7 @@ Tests are named as their suites name them: Robot tests in [renode/oximeter.robot
 
 **Built.** MCUboot checks an ECDSA P-256 signature over the image and its header at every boot, not only after an update (`BOOT_VALIDATE_SLOT0`), with the public half of the release key built into it. The build makes the release key on its first run and never commits it ([app/sysbuild.cmake](../../app/sysbuild.cmake)), so MCUboot's published development key, sysbuild's default, is never trusted.
 
-**Verified by.** "Boots The Signed Oximeter Through MCUboot", "Refuses An Image Signed With MCUboot's Published Key", "Refuses An Image Changed After Signing", "Refuses An Unsigned Update", "Refuses An Update Signed With Another Key".
+**Verified by.** "Never Starts An Image The Release Key Didn't Sign", with an image signed with MCUboot's published key and one changed after signing; "Erases An Update With Anything The Release Key Didn't Sign", with an unsigned update.
 
 **Limits.** Through the debug port, until it's locked (C-11), anyone can replace MCUboot itself. The release key is one per checkout here; a product keeps it in an offline signing service (T-35), and since MCUboot can't be updated, replacing a compromised key needs every device in hand.
 
@@ -117,7 +117,7 @@ Tests are named as their suites name them: Robot tests in [renode/oximeter.robot
 
 **Built.** Outside the signature, an image may carry only fields that can't be signed, such as the signature itself: MCUboot refuses an image with any other field there (`CONFIG_MCUBOOT_USE_TLV_ALLOW_LIST`, [app/sysbuild/mcuboot.conf](../../app/sysbuild/mcuboot.conf)), as CVE-2024-32883 requires.
 
-**Verified by.** "Refuses An Update With A Field Added Outside Its Signature".
+**Verified by.** "Erases An Update With Anything The Release Key Didn't Sign", with an update given a security counter outside its signature.
 
 ### C-10 Strict decoding of what other devices send
 
