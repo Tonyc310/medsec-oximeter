@@ -62,13 +62,18 @@ MIC Should Be
 
 Decrypting Should Fail The MIC
     [Arguments]               ${packet}
+    # After an authentic packet, so a status it left would fail the row: 0 is also the reset value.
     Configure The Link        0    1
+    Decrypt                   0f05009fcda7f448
+    MIC Should Be             1
     Decrypt                   ${packet}
     MIC Should Be             0
 
 Should Leave An Empty Packet As It Is
     [Arguments]               ${operation}
     Configure The Link        1    0
+    # Something else first, so a row can't pass on what the row before it left.
+    Write Hex                 ${OUTPUT}    ffffff
     Run Keyword               ${operation}    010000
     ${packet}=                Read Hex    ${OUTPUT}    3
     Should Be Equal           ${packet}    010000
