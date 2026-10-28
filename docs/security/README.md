@@ -15,10 +15,10 @@ The cybersecurity documentation FDA's premarket guidance (February 2026 edition)
 | [Security controls](controls.md) | each control's requirement, implementation, threats and tests, by FDA's categories | security architecture | done but for the debug-port lock |
 | [SBOM](sbom.md) | every software component, its version, supplier, identifiers and support, made from each build | SBOM | done |
 | [Vulnerability assessment](vulnerabilities.md) | each component's known vulnerabilities and what they mean for this device, checked against NVD every week | vulnerability assessment | done |
-| Test report | method, expected and actual result for every control | cybersecurity testing | Phase 6 |
+| [Test report](test-report.md) | how each kind of testing FDA names was done, the result, the defects found and what's open | cybersecurity testing | done but for hardware and penetration testing |
 | Management plan and labeling | postmarket vulnerability handling; what users are told | management plan; labeling | Phase 7 |
-| Traceability | threat → control → test → result | traceability | grows each phase |
+| [Traceability](traceability.md) | threat → control → tests, checked on every push | traceability | done for the controls built |
 
 ## IDs
 
-Anything another document refers to has an ID: **E** elements, **I** interfaces, **AS** assets, **ADV** adversaries, **Z** trust zones, **TB** trust boundaries, **UC** use cases. Later documents add **T** threats, **C** controls and **V** verification.
+Anything another document refers to has an ID: **E** elements, **I** interfaces, **AS** assets, **ADV** adversaries, **Z** trust zones, **TB** trust boundaries, **UC** use cases. Later documents add **T** threats and **C** controls. Tests go by their names.
