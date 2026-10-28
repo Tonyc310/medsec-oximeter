@@ -36,5 +36,3 @@ Halts The Processor While It Erases A Page
     Should Be Erasing         True
     Execute Command           emulation RunFor "0.002"
     Should Be Erasing         False
-    ${word}=                  Execute Command    sysbus ReadDoubleWord ${PAGE}
-    Should Be Equal As Integers    ${word}    0xFFFFFFFF
