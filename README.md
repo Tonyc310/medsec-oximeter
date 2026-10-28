@@ -149,12 +149,13 @@ UBSAN_OPTIONS=halt_on_error=1:suppressions=fuzz/smp/ubsan.supp build/smp_fuzz/ze
     build/smp_fuzz/corpus build/smp_fuzz/seeds -dict=fuzz/smp/smp.dict -max_total_time=60
 ```
 
-The Python tools follow PEP 8 and PEP 257, checked by ruff, and mypy checks their types strictly ([pyproject.toml](pyproject.toml)). The SBOM tool's tests check that it lists every component built into either image with its version and identifiers, and that it refuses one the curated list doesn't name. The vulnerability check's tests, with a stand-in for NVD, check that it passes when every CVE found has a disposition and names one that doesn't. The key check's tests check that it passes an image holding no key and names each key planted in one:
+The Python tools follow PEP 8 and PEP 257, checked by ruff, and mypy checks their types strictly ([pyproject.toml](pyproject.toml)). The SBOM tool's tests check that it lists every component built into either image with its version and identifiers, and that it refuses one the curated list doesn't name. The vulnerability check's tests, with a stand-in for NVD, check that it passes when every CVE found has a disposition and names one that doesn't. The key check's tests check that it passes an image holding no key and names each key planted in one. The traceability tool's tests check that it builds a row for each threat, names each break in the chain from threat to control to test, and names a table that's out of date. The tool itself checks that every test the [controls](docs/security/controls.md) name exists, and that [docs/security/traceability.md](docs/security/traceability.md) is up to date; without `--check`, it rewrites the table:
 
 ```bash
 ruff check tools fuzz && ruff format --check tools fuzz
 mypy
 pytest
+python3 tools/traceability.py --check
 ```
 
 The key check searches the built images for every secret the firmware must not hold: the backend's two masters, the release key's private half, and the keys provisioned into the oximeter the Renode tests run. MCUboot holds the release key's public half, which belongs there; the hub isn't checked, since it holds the masters by design:
@@ -214,7 +215,7 @@ common/         what the two applications share: Bluetooth and crypto definition
 core/           the oximetry analysis, the PLX encoding, the alarm checks and signed limit changes: portable C17, no Zephyr
 tests/          Unity tests for core/, run on the host
 fuzz/           libFuzzer targets for core/'s parsers, and in smp/ for the update protocol on native_sim
-tools/          provision.py, the factory's step that puts an oximeter's keys into UICR; sbom.py, the SBOM of a build; vulns.py, the vulnerability check; find_keys.py, the check that no key is built in; tests/
+tools/          provision.py, the factory's step that puts an oximeter's keys into UICR; sbom.py, the SBOM of a build; vulns.py, the vulnerability check; find_keys.py, the check that no key is built in; traceability.py, the table from threat to test; tests/
 renode/         Renode platform, scripts, the MAX30101, flash controller, CCM and radio models, and the Robot tests
 docs/security/  the cybersecurity documentation for a premarket submission
 deps/           Zephyr and its modules, fetched by west (git-ignored)

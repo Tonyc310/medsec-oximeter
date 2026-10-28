@@ -1,6 +1,6 @@
 # Security controls
 
-The controls built against the [threat model](threat-model.md), grouped the way FDA's premarket guidance groups them (Appendix 1). For each one: what it must do, how it's built, the threats it addresses and the tests that verify it. The threat model stays the Phase 2 baseline, before any control. The test report (Phase 6) records each test's result, and the risk assessment rates what's left.
+The controls built against the [threat model](threat-model.md), grouped the way FDA's premarket guidance groups them (Appendix 1). For each one: what it must do, how it's built, the threats it addresses and the tests that verify it. [traceability.md](traceability.md) traces each threat to its controls and their tests. The threat model stays the Phase 2 baseline, before any control. The test report (Phase 6) records each test's result, and the risk assessment rates what's left.
 
 > Portfolio exercise, not a medical device.
 
@@ -125,7 +125,7 @@ Tests are named as their suites name them: Robot tests in [renode/oximeter.robot
 
 **Built.** The decoders in `core/` check length, flags and range before taking anything: limits ([core/src/alarm.c](../../core/src/alarm.c)), limit commands ([core/src/limits_auth.c](../../core/src/limits_auth.c)), readings at the hub ([core/src/plx.c](../../core/src/plx.c)) and log records ([core/src/security_log.c](../../core/src/security_log.c)). Requests over SMP go to Zephyr's MCUmgr.
 
-**Verified by.** The unit tests' refusals, such as `test_rejects_limits_of_the_wrong_length`, `test_keeps_the_limits_in_force_when_it_rejects_new_ones`, `test_rejects_a_length_that_does_not_match_its_flags`, `test_rejects_reserved_flags`, `test_keeps_the_last_reading_when_it_rejects_a_measurement`, `test_ignores_malformed_records_found_in_flash`; the fuzz targets `fuzz_limits_command`, `fuzz_plx_decode` and `fuzz_security_log`, and the update-protocol fuzzer, each under AddressSanitizer and UndefinedBehaviorSanitizer.
+**Verified by.** The unit tests' refusals, such as `test_rejects_limits_of_the_wrong_length`, `test_keeps_the_limits_in_force_when_it_rejects_new_ones`, `test_rejects_a_length_that_does_not_match_its_flags`, `test_rejects_reserved_flags`, `test_keeps_the_last_reading_when_it_rejects_a_measurement`, `test_ignores_malformed_records_found_in_flash`; the fuzz targets `fuzz_limits_command`, `fuzz_plx_decode` and `fuzz_security_log`, and the update-protocol fuzzer ([fuzz/smp](../../fuzz/smp)), each under AddressSanitizer and UndefinedBehaviorSanitizer.
 
 **Limits.** Zephyr's Bluetooth stack below the characteristics is not fuzzed here (T-16).
 
@@ -241,7 +241,7 @@ Readings, limits and the log travel only over the encrypted link of C-01 and C-0
 
 **Built.** Every build makes a CycloneDX SBOM of what it compiled ([sbom.md](sbom.md)); every week CI asks NVD for the CVEs in its components and fails until each has a disposition ([vulnerabilities.md](vulnerabilities.md)).
 
-**Verified by.** The SBOM tool's and the vulnerability check's tests ([tools/tests/](../../tools/tests/)).
+**Verified by.** The two tests of [tools/tests/test_sbom.py](../../tools/tests/test_sbom.py), on the SBOM tool, and the two tests of [tools/tests/test_vulns.py](../../tools/tests/test_vulns.py), on the vulnerability check.
 
 ## Threats without a control yet
 

@@ -41,6 +41,10 @@ jobs:
       - name: pytest
         run: pytest
 
+      # Every test the controls name exists, and docs/security/traceability.md is up to date.
+      - name: Traceability
+        run: python3 tools/traceability.py --check
+
   host:
     runs-on: ubuntu-24.04
     steps:
