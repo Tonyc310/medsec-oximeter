@@ -341,6 +341,20 @@ Keeps The Clinician's Limits Through A Reset
     Wait For Line On Uart     ALARM: SpO2 low    testerId=${oximeter}    timeout=10
     Assert LED State          true
 
+Reads Every Sample Waiting In The Sensor
+    Start System
+    Monitor A Patient At 94 Percent
+    # 200 ms without an interrupt, as when a flash erase or a key computation holds the firmware
+    # up: 20 samples wait in the sensor, and the next interrupt reads them all.
+    Execute Command           pause
+    Execute Command           ${SENSOR} InterruptCut true
+    Execute Command           emulation RunFor "0.2"
+    Execute Command           ${SENSOR} InterruptCut false
+    Execute Command           emulation RunFor "0.05"
+    ${waiting}=               Execute Command    ${SENSOR} Unread
+    ${waiting}=               Convert To Integer    ${waiting.strip()}
+    Should Be True            ${waiting} <= 1
+
 Raises The Technical Alarm When The Sensor Stops
     Start System
     Monitor A Patient At 94 Percent

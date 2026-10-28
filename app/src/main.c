@@ -6,6 +6,7 @@
 #include "pairing.h"
 #include "pairing_seal.h"
 #include "plx_service.h"
+#include "sensor_fifo.h"
 #include "supervisor.h"
 #include "update_guard.h"
 #include "update_log.h"
@@ -13,12 +14,15 @@
 #include <mbedtls/platform_util.h>
 #include <zephyr/device.h>
 #include <zephyr/dfu/mcuboot.h>
+#include <zephyr/drivers/i2c.h>
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(oximeter, LOG_LEVEL_INF);
 
 #define SENSOR_NODE DT_NODELABEL(max30101)
+/* FIFO_WR_PTR, then OVF_COUNTER and FIFO_RD_PTR: what sensor_fifo_t holds. */
+#define SENSOR_FIFO_REGISTERS 0x04u
 /* Samples per second reaching the FIFO: the sample rate after on-chip averaging. */
 #define SAMPLE_RATE_HZ (DT_PROP(SENSOR_NODE, smp_sr) / DT_PROP(SENSOR_NODE, smp_ave))
 
@@ -26,6 +30,7 @@ BUILD_ASSERT(SAMPLE_RATE_HZ == OXIMETRY_SAMPLE_RATE_HZ,
              "the oximetry analysis expects the sensor at OXIMETRY_SAMPLE_RATE_HZ");
 
 static const struct device *const sensor = DEVICE_DT_GET(SENSOR_NODE);
+static const struct i2c_dt_spec sensor_bus = I2C_DT_SPEC_GET(SENSOR_NODE);
 static oximetry_t oximetry;
 
 /* Called with each reading: the self-test an update must pass. The sensor answered with its part
@@ -49,14 +54,14 @@ static void confirm_image(void)
     confirmed = true;
 }
 
-/* Runs on the sensor driver's thread, once per sample, when the sensor's INT line falls. */
-static void on_sample(const struct device *dev, const struct sensor_trigger *trigger)
+/* Takes the oldest sample in the sensor's FIFO into the analysis, and sends the reading once a
+ * second. */
+static void take_sample(const struct device *dev)
 {
     struct sensor_value red;
     struct sensor_value infrared;
     oximetry_reading_t reading;
 
-    ARG_UNUSED(trigger);
     if ((sensor_sample_fetch(dev) != 0) || (sensor_channel_get(dev, SENSOR_CHAN_RED, &red) != 0) ||
         (sensor_channel_get(dev, SENSOR_CHAN_IR, &infrared) != 0)) {
         LOG_WRN("sample lost");
@@ -81,6 +86,29 @@ static void on_sample(const struct device *dev, const struct sensor_trigger *tri
     }
     plx_service_send(&reading);
     alarm_service_update(&reading);
+}
+
+/* Runs on the sensor driver's thread when the sensor's INT line falls: a new sample is in its FIFO.
+ * Whatever held this thread up may have left more, so all of them are read. Reading one an
+ * interrupt would leave the rest waiting for good, until the FIFO filled and dropped new ones. */
+static void on_sample(const struct device *dev, const struct sensor_trigger *trigger)
+{
+    uint8_t registers[3];
+
+    ARG_UNUSED(trigger);
+    if (i2c_burst_read_dt(&sensor_bus, SENSOR_FIFO_REGISTERS, registers, sizeof registers) != 0) {
+        LOG_WRN("could not read the sensor's FIFO");
+        return;
+    }
+    const sensor_fifo_t fifo = {
+        .write_pointer = registers[0],
+        .overflow = registers[1],
+        .read_pointer = registers[2],
+    };
+
+    for (uint32_t waiting = sensor_fifo_waiting(fifo); waiting > 0u; waiting--) {
+        take_sample(dev);
+    }
 }
 
 /* With no samples there's nothing to measure, so a stopped sensor reads as no reading: the
