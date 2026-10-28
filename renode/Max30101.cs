@@ -8,8 +8,9 @@ using Antmicro.Renode.Time;
 
 namespace Antmicro.Renode.Peripherals.Sensors
 {
-    // MAX30101 pulse oximetry and heart-rate sensor on I2C: the registers Zephyr's driver uses in
-    // SpO2 mode, a 32-sample FIFO filled at the configured rate, and the active-low INT pin.
+    // MAX30101 pulse oximetry and heart-rate sensor on I2C: the registers Zephyr's driver and the
+    // firmware use in SpO2 mode, a 32-sample FIFO filled at the configured rate, and the active-low
+    // INT pin.
     // Anything else is logged as unmodeled.
     //
     // Each sample is a synthetic photoplethysmogram (PPG): the light that comes back through the
@@ -44,6 +45,7 @@ namespace Antmicro.Renode.Peripherals.Sensors
             writePointer = 0;
             readPointer = 0;
             unread = 0;
+            overflow = 0;
             fifoConfig = 0;
             modeConfig = 0;
             spo2Config = 0;
@@ -92,6 +94,12 @@ namespace Antmicro.Renode.Peripherals.Sensors
 
         public GPIO IRQ { get; }
 
+        // For tests: the samples waiting in the FIFO, and every sample lost to it being full since
+        // the machine was created (the chip's own count stops at 31 and clears with each read).
+        public int Unread => unread;
+
+        public ulong LostSamples { get; private set; }
+
         // Beats per minute.
         public double HeartRate { get; set; }
 
@@ -117,6 +125,18 @@ namespace Antmicro.Renode.Peripherals.Sensors
             }
         }
 
+        // Cuts the INT line, as a broken wire would: the pull-up holds it high, so the firmware
+        // hears of no samples while they pile up in the FIFO, as if it were late reading them.
+        public bool InterruptCut
+        {
+            get => interruptCut;
+            set
+            {
+                interruptCut = value;
+                UpdateInterrupt();
+            }
+        }
+
         private void Advance()
         {
             // Reads of FIFO_DATA stay on it, so a burst read drains whole samples.
@@ -138,6 +158,12 @@ namespace Antmicro.Renode.Peripherals.Sensors
                 return status;
             case Register.InterruptEnable1:
                 return interruptEnable;
+            case Register.FifoWritePointer:
+                return (byte)writePointer;
+            case Register.OverflowCounter:
+                return overflow;
+            case Register.FifoReadPointer:
+                return (byte)readPointer;
             case Register.FifoData:
                 return ReadFifoByte();
             case Register.FifoConfig:
@@ -155,7 +181,9 @@ namespace Antmicro.Renode.Peripherals.Sensors
                 return PartId;
             // Renode's TWI controller fetches the next byte as soon as one is taken, so reading one
             // register also reads the one after it. These follow registers the driver reads; with die
-            // temperature and proximity sensing unused, they keep their reset value.
+            // temperature and proximity sensing unused, they keep their reset value. (FIFO_RD_PTR is
+            // followed by FIFO_DATA: the byte that read takes is dropped when the next transfer
+            // selects a register, so no sample is lost.)
             case Register.InterruptStatus2:
             case Register.InterruptEnable2:
             case Register.PilotAmplitude:
@@ -226,7 +254,10 @@ namespace Antmicro.Renode.Peripherals.Sensors
         {
             if(unread == FifoDepth)
             {
-                // Without rollover, the driver's default, a full FIFO keeps its oldest samples.
+                // Without rollover, the driver's default, a full FIFO keeps its oldest samples and
+                // counts the new ones it loses.
+                overflow = (byte)Math.Min(overflow + 1, MaxOverflow);
+                LostSamples++;
                 return;
             }
             var phase = (sampleIndex * HeartRate / 60.0 / sampler.Frequency) % 1.0;
@@ -277,6 +308,7 @@ namespace Antmicro.Renode.Peripherals.Sensors
                 {
                     readPointer = (readPointer + 1) % FifoDepth;
                     unread--;
+                    overflow = 0;
                 }
             }
             return result;
@@ -286,7 +318,7 @@ namespace Antmicro.Renode.Peripherals.Sensors
         {
             var pending = powerReady || (sampleReady && (interruptEnable & SampleReadyBit) != 0);
             // Active low: the pin idles high and drops while an enabled interrupt is pending.
-            IRQ.Set(!pending);
+            IRQ.Set(!pending || interruptCut);
         }
 
         private byte address;
@@ -298,17 +330,20 @@ namespace Antmicro.Renode.Peripherals.Sensors
         private int writePointer;
         private int readPointer;
         private int unread;
+        private byte overflow;
         private byte fifoConfig;
         private byte modeConfig;
         private byte spo2Config;
         private ulong sampleIndex;
         private bool stopped;
+        private bool interruptCut;
 
         private readonly LimitTimer sampler;
         private readonly Sample[] fifo;
         private readonly byte[] ledAmplitude = new byte[4];
 
         private const int FifoDepth = 32;
+        private const int MaxOverflow = 31;
         private const byte SampleReadyBit = 0x40;
         private const byte PowerReadyBit = 0x01;
         private const byte ResetBit = 0x40;
@@ -337,6 +372,9 @@ namespace Antmicro.Renode.Peripherals.Sensors
             InterruptStatus2 = 0x01,
             InterruptEnable1 = 0x02,
             InterruptEnable2 = 0x03,
+            FifoWritePointer = 0x04,
+            OverflowCounter = 0x05,
+            FifoReadPointer = 0x06,
             FifoData = 0x07,
             FifoConfig = 0x08,
             ModeConfig = 0x09,

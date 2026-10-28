@@ -16,7 +16,7 @@ Phase 4, the security controls, is done but for the debug-port lock, which needs
 
 Phase 5, the SBOM and the vulnerability assessment, is done. Every build makes an SBOM of what it compiled ([docs/security/sbom.md](docs/security/sbom.md)), and every known vulnerability in its components has a written assessment of whether it affects the oximeter ([docs/security/vulnerabilities.md](docs/security/vulnerabilities.md)). A weekly check asks NVD for new CVEs and fails until each has one.
 
-Renode has no model of the MAX30101, so [renode/Max30101.cs](renode/Max30101.cs) adds one: the registers Zephyr's driver uses, the 32-sample FIFO filled at the configured rate, the interrupt line, and a synthetic pulse waveform whose light level, pulse depth and heart rate a test can set. Nor does it model the nRF52840's flash controller, which keeping anything in flash needs: [renode/Nvmc.cs](renode/Nvmc.cs) erases flash pages, each taking the 85 ms the chip's specification gives with the processor halted, as on the chip, and Zephyr's own flash driver tests check it. Nor the CCM, which encrypts and decrypts Bluetooth packets on an encrypted link: [renode/Ccm.cs](renode/Ccm.cs) adds it, checked against the Bluetooth specification's own sample data. And Renode's radio model hears a frame it missed whenever it next listens, late and even on another channel, which on an encrypted link breaks the packet sequence and drops the link: [renode/Radio.cs](renode/Radio.cs) is Renode's model with that fixed, and [renode/nrf52840dk.repl](renode/nrf52840dk.repl) Renode's description of the board, using it (both MIT, [renode/LICENSE-renode](renode/LICENSE-renode)).
+Renode has no model of the MAX30101, so [renode/Max30101.cs](renode/Max30101.cs) adds one: the registers Zephyr's driver and the firmware use, the 32-sample FIFO filled at the configured rate, with its pointers and its count of samples lost, the interrupt line, a synthetic pulse waveform whose light level, pulse depth and heart rate a test can set, and two faults a test can cause, a stopped sensor and a cut interrupt line. Nor does it model the nRF52840's flash controller, which keeping anything in flash needs: [renode/Nvmc.cs](renode/Nvmc.cs) erases flash pages, each taking the 85 ms the chip's specification gives with the processor halted, as on the chip, and Zephyr's own flash driver tests check it. Nor the CCM, which encrypts and decrypts Bluetooth packets on an encrypted link: [renode/Ccm.cs](renode/Ccm.cs) adds it, checked against the Bluetooth specification's own sample data. And Renode's radio model hears a frame it missed whenever it next listens, late and even on another channel, which on an encrypted link breaks the packet sequence and drops the link: [renode/Radio.cs](renode/Radio.cs) is Renode's model with that fixed, and [renode/nrf52840dk.repl](renode/nrf52840dk.repl) Renode's description of the board, using it (both MIT, [renode/LICENSE-renode](renode/LICENSE-renode)).
 
 ## How it measures
 
@@ -183,6 +183,12 @@ Another checks the CCM model against the Bluetooth Core specification's sample d
 
 ```bash
 cd build/renode && renode-test ../../renode/ccm.robot
+```
+
+Another checks the MAX30101 model with no firmware: its FIFO's pointers show the samples waiting, it counts the samples a full FIFO loses, up to 31 as the chip does, and reading a sample clears that count:
+
+```bash
+cd build/renode && renode-test ../../renode/sensor.robot
 ```
 
 The last checks the radio model with two radios and no firmware: a frame sent while the other isn't listening is lost if it listens 5 ms later, or on another channel, and heard if it listens 150 µs later, still in the same exchange:

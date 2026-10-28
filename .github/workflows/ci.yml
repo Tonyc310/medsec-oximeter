@@ -198,7 +198,7 @@ jobs:
         run: |
           mkdir -p build/renode && cd build/renode
           renode-test ../../renode/oximeter.robot ../../renode/boot.robot ../../renode/flash.robot \
-            ../../renode/ccm.robot ../../renode/radio.robot
+            ../../renode/ccm.robot ../../renode/radio.robot ../../renode/sensor.robot
 
       - name: Upload Renode results
         if: failure()
