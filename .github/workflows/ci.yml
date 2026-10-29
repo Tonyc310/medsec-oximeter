@@ -45,6 +45,10 @@ jobs:
       - name: Traceability
         run: python3 tools/traceability.py --check
 
+      # Every score in docs/security/risk-assessment.md is the one its vector and severity give.
+      - name: Risk scores
+        run: python3 tools/cvss.py --check
+
   host:
     runs-on: ubuntu-24.04
     steps:
