@@ -142,11 +142,21 @@ static void test_never_reports_spo2_above_100_percent(void)
     TEST_ASSERT_EQUAL_UINT8(100u, reading.spo2_percent);
 }
 
+/* The README promises a reading from a 0.1% perfusion index. */
+static void test_measures_the_weakest_pulse_it_accepts(void)
+{
+    patient_t patient = healthy;
+
+    patient.infrared_pulse = 143.0f; /* 0.11% */
+    (void)feed(&patient, SECONDS(4u));
+    TEST_ASSERT_TRUE(reading.valid);
+}
+
 static void test_reports_nothing_for_a_pulse_too_weak_to_measure(void)
 {
     patient_t patient = healthy;
 
-    patient.infrared_pulse = 50.0f; /* 0.04% of the light level */
+    patient.infrared_pulse = 117.0f; /* 0.09% */
     TEST_ASSERT_EQUAL_UINT32(1u, feed(&patient, SECONDS(4u)));
     TEST_ASSERT_FALSE(reading.valid);
 }
@@ -181,6 +191,7 @@ int main(void)
     RUN_TEST(test_reports_nothing_for_a_pulse_outside_its_range);
     RUN_TEST(test_measures_spo2_across_its_range);
     RUN_TEST(test_never_reports_spo2_above_100_percent);
+    RUN_TEST(test_measures_the_weakest_pulse_it_accepts);
     RUN_TEST(test_reports_nothing_for_a_pulse_too_weak_to_measure);
     RUN_TEST(test_reports_nothing_for_noise_without_a_rhythm);
     return UNITY_END();

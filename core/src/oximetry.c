@@ -9,9 +9,13 @@
 #define CALIBRATION_SLOPE 25.0f
 #define MAX_SPO2 100.0f
 
-/* Below a 0.1% perfusion index (the pulse relative to the light level) the pulse is too weak to
- * measure reliably. */
+/* Below a 0.1% perfusion index (the pulse's peak-to-peak size relative to the light level) the
+ * pulse is too weak to measure reliably. */
 #define MIN_PERFUSION 0.001f
+
+/* The analysis measures the pulse's RMS, which a single noisy sample moves far less than its peaks,
+ * and scales it as for a sine wave, whose peak-to-peak size is 2 sqrt(2) times its RMS. */
+#define PEAK_TO_PEAK_PER_RMS 2.8284271f
 
 /* How closely the signal a beat later must match itself (autocorrelation, 1 = identical) for the
  * pulse to count as steady. */
@@ -124,8 +128,9 @@ static bool analyse(oximetry_t *oximetry, oximetry_reading_t *reading)
         return false;
     }
 
-    const float perfusion =
-        sqrtf((float)infrared.squares / (float)OXIMETRY_WINDOW_SAMPLES) / (float)infrared.mean;
+    const float perfusion = PEAK_TO_PEAK_PER_RMS *
+                            sqrtf((float)infrared.squares / (float)OXIMETRY_WINDOW_SAMPLES) /
+                            (float)infrared.mean;
     if (perfusion < MIN_PERFUSION) {
         return false;
     }
