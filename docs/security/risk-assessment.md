@@ -482,3 +482,56 @@ Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:
 **T-37**, C-12's reset deletes the bond and the limits, so the old gateway can't connect again. The security log stays, as evidence, and holds the last patient's limit changes, which anyone holding the device can read through the debug port. Staff forgetting the reset is a use error, for the safety risk assessment.
 
 Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:N/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:L/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:N/XIL:N/XAH:N/XAL:N`
+
+## Risk that's left
+
+With the controls built, 22 of the 36 threats scored are controlled and 14 aren't: five on the oximeter as built, and nine against the gateway and the backend, which aren't built yet. None of the components' known vulnerabilities ([vulnerability assessment](vulnerabilities.md)) is in CISA's Known Exploited Vulnerabilities catalog, as of its 28 October 2026 edition, so that rule adds none.
+
+Each uncontrolled risk needs a control, or a reason it can't have one:
+
+| Threats | What they need |
+|---|---|
+| T-10, a jammed link | It can't be prevented. The gateway and the backend need a technical alarm within 2 s of readings stopping, so the loss isn't silent; C-19 already notices it. With that alarm built, the severity is rated again. |
+| T-11, a held connection | The oximeter should drop a central that doesn't reach security level 4 within a few seconds, and keep a connection free for its bonded gateway; and the alarm of T-10. |
+| T-16 and T-36, a flaw in the Bluetooth stack or another component | No control rules out a bug in third-party code, so this can't be designed out. Against it: fuzzing of the oximeter's own parsers (C-10), the weekly check for known vulnerabilities (C-22), signed updates to deliver a fix (C-20), and secure boot, so an exploit doesn't survive a restart (C-08). Still to do: fuzz the Bluetooth protocols Zephyr handles before pairing, and turn off those the oximeter doesn't use. |
+| T-17, a crash an attacker repeats | As T-16, and the alarm of T-10, so the restarts are seen. |
+| T-22, a compromised gateway alters readings | Readings tagged by the oximeter, as its log records are (C-14), so the backend can tell an altered one; and the alarm of T-23 for those dropped. |
+| T-23 and T-31, the gateway or the backend down | A technical alarm at the backend when a gateway goes quiet, and at the gateway when the backend does; a backend run with redundancy. |
+| T-25 and T-26, a fake backend or gateway, or traffic altered in transit | Mutual authentication and encryption between gateway and backend, such as TLS with a certificate on each side. |
+| T-27, a stolen clinician login | Multi-factor sign-in, and each clinician reaching only their own patients. |
+| T-28, a compromised backend | The masters held in a hardware security module, so a compromised server can ask for signatures but can't take the keys; least privilege and monitoring. |
+| T-33 and T-35, a stolen release key | The offline signing service, with access controlled and logged. MCUboot can't be updated, so a release key compromised after devices ship can be replaced only with every device in hand. |
+
+**Conclusion.** The residual risk isn't acceptable yet: fourteen risks are uncontrolled. On the oximeter, T-11 needs a firmware change, and T-10 and T-17 the technical alarm that comes with the gateway and the backend. T-16 and T-36 can't be designed out; they rest on the reasons above and on monitoring and updates after release. The other nine come with the gateway and the backend, and are scored again when those are built. No risk needs the debug-port lock (C-11) to be controlled under these acceptance criteria, but most of the remote threats now come down to reading the oximeter's keys out with it in hand, and the lock is what closes that.
+
+## To the safety risk assessment
+
+Security and safety meet at three hazardous situations: an alarm that doesn't sound at the limits the clinician set, a reading shown that's wrong or another patient's, and monitoring that stops with no alarm at the central station. Each threat that can cause one passes to the safety risk assessment as one of its causes, with its exploitability after controls. That assessment isn't part of this project.
+
+| Threat | Hazardous situations it can cause | Exploitability after controls |
+|---|---|---|
+| T-01, T-02, T-03, T-21 | alarm not at the clinician's limits | Low |
+| T-06 | alarm not at the clinician's limits; silent loss of monitoring | Low |
+| T-08, T-12 | wrong reading | Low |
+| T-09, T-19 | wrong reading; silent loss of monitoring | Low |
+| T-14, T-34 | all three | Low |
+| T-10, T-11, T-17 | silent loss of monitoring | High |
+| T-16, T-36 | all three | High |
+| T-22, T-26 | wrong reading; silent loss of monitoring | Medium, design |
+| T-23, T-31 | silent loss of monitoring | High, design |
+| T-25 | alarm not at the clinician's limits; wrong reading | High, design |
+| T-27 | alarm not at the clinician's limits | High, design |
+| T-28, T-33, T-35 | all three | Medium, design |
+
+Two use errors turned up here, for the safety risk assessment too: staff pairing a gateway with the wrong bed's oximeter (T-12), and staff forgetting the reset before the next patient (T-37), after which the old gateway still connects.
+
+## Unresolved anomalies
+
+Known defects left unfixed, each assessed for what an attacker could make of it, with its CWE, as FDA's guidance asks.
+
+| Anomaly | CWE | Security impact |
+|---|---|---|
+| In noise, the pulse rate reads 3 to 5 bpm high, and once half the rate, before the rhythm check refuses the signal ([test report](test-report.md#open-items)) | CWE-682, incorrect calculation | Noise reaches the analysis only through the sensor: light, movement or signals on its bus, all with the device in hand, as T-19. Nothing over the air adds noise. Its wrong readings are for the safety risk assessment. |
+| Zephyr's MCUmgr calls decoders through a function pointer of another type ([vulnerability assessment](vulnerabilities.md#found-by-fuzzing)) | CWE-686, function call with incorrect argument type | None: the call is the same whatever a request holds, and only the paired gateway reaches MCUmgr (C-04). |
+| Zephyr's MCUmgr shifts the flash's erased byte into the sign bit of an `int` (the same) | CWE-190, integer overflow | None: the byte is the flash's, not a gateway's. |
+| A second update can time out at the gateway's stand-in while the oximeter erases the old update's slot; seen once in a probe, never in the tests ([test report](test-report.md#open-items)) | none fits: a timing fault between two devices | Only the paired gateway sends updates, and a failed one leaves the running image in place (C-20). A fix arrives later, which lengthens the time T-36 stays open. |
