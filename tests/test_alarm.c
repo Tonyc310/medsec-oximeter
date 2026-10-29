@@ -131,6 +131,19 @@ static void test_rejects_limits_just_outside_each_range(void)
     }
 }
 
+/* Each limit's low byte alone would be a valid setting. */
+static void test_reads_both_bytes_of_each_pulse_limit(void)
+{
+    static const limits_case_t cases[] = {
+        {"low limit of 336 bpm, 80 in its low byte", 90u, 336u, 120u},
+        {"high limit of 376 bpm, 120 in its low byte", 90u, 50u, 376u},
+    };
+
+    for (size_t i = 0u; i < (sizeof cases / sizeof cases[0]); i++) {
+        TEST_ASSERT_FALSE_MESSAGE(decode(&cases[i]), cases[i].name);
+    }
+}
+
 static void test_rejects_limits_of_the_wrong_length(void)
 {
     static const uint8_t too_short[] = {95u, 50u, 0u, 120u};
@@ -162,6 +175,7 @@ int main(void)
     RUN_TEST(test_encodes_limits_the_way_it_decodes_them);
     RUN_TEST(test_accepts_limits_at_the_edges_of_each_range);
     RUN_TEST(test_rejects_limits_just_outside_each_range);
+    RUN_TEST(test_reads_both_bytes_of_each_pulse_limit);
     RUN_TEST(test_rejects_limits_of_the_wrong_length);
     RUN_TEST(test_keeps_the_limits_in_force_when_it_rejects_new_ones);
     return UNITY_END();
