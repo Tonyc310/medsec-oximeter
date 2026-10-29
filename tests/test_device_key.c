@@ -13,14 +13,26 @@ void tearDown(void)
 {
 }
 
+/* The check reads every byte: a key one byte away from erased or zeroed flash is still a key. */
 static void test_accepts_a_provisioned_key(void)
 {
-    uint8_t key[DEVICE_KEY_SIZE];
+    static const struct {
+        const char *name;
+        uint8_t fill;
+        uint8_t last;
+    } cases[] = {
+        {"a provisioned key", 0x5Au, 0xA5u},
+        {"erased but for its last byte", 0xFFu, 0xFEu},
+        {"zeroed but for its last byte", 0x00u, 0x01u},
+    };
 
-    for (size_t i = 0u; i < sizeof key; i++) {
-        key[i] = (uint8_t)(0x5Au + i);
+    for (size_t i = 0u; i < (sizeof cases / sizeof cases[0]); i++) {
+        uint8_t key[DEVICE_KEY_SIZE];
+
+        (void)memset(key, cases[i].fill, sizeof key);
+        key[DEVICE_KEY_SIZE - 1u] = cases[i].last;
+        TEST_ASSERT_TRUE_MESSAGE(device_key_provisioned(key), cases[i].name);
     }
-    TEST_ASSERT_TRUE(device_key_provisioned(key));
 }
 
 /* Erased flash reads as all ones; writing can only clear bits, so all zeros is what someone who
