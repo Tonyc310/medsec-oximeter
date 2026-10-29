@@ -50,3 +50,219 @@ Two rules override the table. A vulnerability in a component that's listed in CI
 **To the safety risk assessment.** FDA's guidance treats security and safety risk management as separate but connected processes. A threat whose harm is a hazardous situation, such as an alarm that doesn't sound, a wrong reading shown or monitoring that stops unnoticed, passes to the safety risk assessment as one more cause of that hazardous situation, with its exploitability after controls, and ISO 14971's analysis takes it from there. This project has no safety risk file, so the assessment lists the threats that would pass, with the hazardous situation each would pass as.
 
 **Unresolved anomalies.** Known defects left unfixed are assessed for their security impact and their CWE, as FDA's guidance asks: the oximeter's readings in noise ([test report](test-report.md#open-items)) and the undefined behavior fuzzing found in Zephyr's MCUmgr ([vulnerability assessment](vulnerabilities.md#found-by-fuzzing)).
+
+## Before controls
+
+The device the [threat model](threat-model.md) describes: the Phase 2 baseline, with no security controls. Each threat's notes give the reasons for the metrics and the severity that aren't obvious from the threat itself, then the rubric's answers. Q5.1 of the Attack Vector questions has no codes in the rubric, so its answer is given in words. A threat marked *design* is against an element that isn't built yet, and is scored against its design.
+
+### The alarm limits
+
+| Threat | Vector | Score | Exploitability | Severity | Risk |
+|---|---|---|---|---|---|
+| T-01 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:C/C:N/I:H/A:N` | 7.4 | 2.8 High | Catastrophic | **uncontrolled** |
+| T-02 | `CVSS:3.0/AV:A/AC:H/PR:N/UI:N/S:C/C:H/I:H/A:N` | 8.0 | 1.6 Medium | Catastrophic | **uncontrolled** |
+| T-03 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:C/C:N/I:H/A:N` | 7.4 | 2.8 High | Catastrophic | **uncontrolled** |
+| T-04 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N` | 4.3 | 2.8 High | None | controlled |
+| T-05 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N` | 6.5 | 2.8 High | None | controlled |
+| T-06 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:C/C:N/I:H/A:N` | 5.3 | 0.9 Low | Serious | controlled |
+
+**T-01**, a device that isn't the gateway writes the limits. *Attack vector*: Bluetooth LE isn't an IP protocol, and the oximeter's radio reaches tens of metres, further with a directional antenna (ADV-1). The rubric rates a wireless link as Local only when its range is about 10 feet or less; it names Bluetooth LE as an example, but the worst case holds when answers conflict, so Adjacent. *Privileges*: the baseline has no authorization model, so every central is the same. *Scope*: the central station's alarms, the system's essential performance, depend on the oximeter's alarm state, which the rubric counts as a changed scope. *Integrity*: the limits are the monitoring function's settings. *Severity*: a falling SpO2 raises no alarm at the bedside or at the central station, and at home the patient may be alone, so death is credible.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:H/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:Y/XIL:NA/XAH:N/XAL:N`
+
+**T-02**, a man in the middle changes limits in transit. *Attack complexity*: the rubric rates a man in the middle as High. *User interaction*: the attacker waits for a clinician's change, but that's the system's normal use, not a victim's action; FIRST scores its own man-in-the-middle example, CVE-2014-0224, the same way. *Confidentiality*: it reads the limits it changes, as T-05. The rest as T-01.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:N/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:L/XID:H/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:N/XAL:N`
+
+**T-03**, a captured write is replayed. Without authentication, a replayed write needs nothing a fresh one doesn't, so it scores as T-01. The threat differs from T-01 only once writes are signed.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:H/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:Y/XIL:NA/XAH:N/XAL:N`
+
+**T-04**, limits change with no record. The oximeter's side: a change through the air leaves no record of who made it. *Integrity*: the missing record is workflow data, not monitoring data. *Severity*: none to health; the harm is that T-01 to T-03 go unnoticed. The backend's records are T-30's.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:N/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:L/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:N/XIL:Y/XAH:N/XAL:N`
+
+**T-05**, anyone in range reads the limits. *Confidentiality*: limits are settings, not readings, so Low as monitoring data; but a lowered limit can reveal a condition, such as a COPD patient's, and an attacker in range can see who wears the device, so the worst case makes them health data about a known person. *Severity*: none to health; the harm is to privacy.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:N/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:L/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:N/XIL:N/XAH:N/XAL:N`
+
+**T-06**, a reset restores the default limits. *Attack vector*: the attacker pulls the battery, through a human-user interface (Q5.1). *Scope and integrity*: as T-01. *Availability*: the restart interrupts readings for seconds, which the rubric counts as no impact. *Severity*: the defaults still alarm below 90% and outside 50 to 120 bpm, so a patient whose clinician set tighter limits is alarmed later, not never.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:H/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:Y/XIL:NA/XAH:N/XAL:N`
+
+### Readings and alarms over Bluetooth
+
+| Threat | Vector | Score | Exploitability | Severity | Risk |
+|---|---|---|---|---|---|
+| T-07 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N` | 6.5 | 2.8 High | None | controlled |
+| T-08 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H` | 9.6 | 2.8 High | Catastrophic | **uncontrolled** |
+| T-09 | `CVSS:3.0/AV:A/AC:H/PR:N/UI:N/S:C/C:H/I:H/A:H` | 8.3 | 1.6 Medium | Catastrophic | **uncontrolled** |
+| T-10 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:C/C:N/I:N/A:H` | 7.4 | 2.8 High | Catastrophic | **uncontrolled** |
+| T-11 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:C/C:N/I:N/A:H` | 7.4 | 2.8 High | Catastrophic | **uncontrolled** |
+| T-12 | `CVSS:3.0/AV:A/AC:H/PR:N/UI:N/S:C/C:H/I:H/A:H` | 8.3 | 1.6 Medium | Catastrophic | **uncontrolled** |
+| T-13 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N` | 6.5 | 2.8 High | None | controlled |
+
+**T-07**, anyone in range subscribes to or sniffs the readings. *Confidentiality*: readings of a person the attacker can see. *Severity*: none to health; the harm is to privacy.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:N/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:N/XIL:N/XAH:N/XAL:N`
+
+**T-08**, a fake oximeter takes the real one's place. *Attack complexity*: an attacker advertising fast is found first whenever the gateway scans, at start-up or after any disconnection. *Scope*: the vulnerable component is the gateway, which connects to anything advertising the service, and the central station's alarms depend on what it relays. *Impact*: the fake's readings replace the patient's, which no longer reach clinicians, and the fake receives any limits the gateway sends, as T-05. *Severity*: false normal readings hide a decline, as T-01.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:L/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-09**, a man in the middle alters readings or alarms. *Attack complexity*: a man in the middle, as T-02. *Impact*: it reads what it relays, as T-07, and can change or drop it. *Severity*: a suppressed alarm, as T-01.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:N/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-10**, jamming. *Attack vector*: a jammer needn't use the protocol at all; answered as an attack over the wireless channel, which gives Adjacent rather than Local, the worst case. *Severity*: at baseline the gateway raises no alarm when readings stop, so the central station is silent and only the oximeter's LED alarms; at home the patient may be asleep and alone.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:N/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:N/XIL:N/XAH:Y/XAL:NA`
+
+**T-11**, an attacker's device holds the oximeter's only connection. *Attack complexity*: the oximeter advertises whenever it isn't connected, and an attacker's central can connect at its first advertisement. *Severity*: as T-10.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:N/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:N/XIL:N/XAH:Y/XAL:NA`
+
+**T-12**, a gateway connects to another bed's oximeter. *Attack complexity*: the other bed's oximeter is connected to its own gateway, so an attacker must first break both links and then win the race to reconnect. *Integrity*: readings recorded against the wrong patient are health data made to refer to another person (Q1.I High). *Severity*: the wrong patient is treated, and the right one's decline goes unseen.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:N/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:H/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-13**, the oximeter is detected and followed. *Confidentiality*: that a known person uses a medical device, and where they go. *Severity*: none to health.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:N/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:N/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:N/XIL:N/XAH:N/XAL:N`
+
+### The oximeter
+
+| Threat | Vector | Score | Exploitability | Severity | Risk |
+|---|---|---|---|---|---|
+| T-14 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H` | 7.6 | 0.9 Low | Catastrophic | controlled |
+| T-15 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N` | 4.6 | 0.9 Low | None | controlled |
+| T-16 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H` | 9.6 | 2.8 High | Catastrophic | **uncontrolled** |
+| T-17 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:C/C:N/I:N/A:H` | 7.4 | 2.8 High | Catastrophic | **uncontrolled** |
+| T-18 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N` | 4.3 | 2.8 High | None | controlled |
+| T-19 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:C/C:N/I:H/A:H` | 7.3 | 0.9 Low | Catastrophic | controlled |
+| T-20 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N` | 4.6 | 0.9 Low | None | controlled |
+
+**T-14**, malicious firmware through the debug port. *Attack vector*: physical; the debug port is inside the case, not directly accessible (Q5.1). *Impact*: the attacker's firmware can do anything the oximeter can. *Severity*: as T-01, persisting through resets. Needing the device in hand keeps exploitability Low, which the acceptance criteria accept.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-15**, firmware and memory read out. *Attack vector*: as T-14. *Confidentiality*: the readings in memory. At baseline the oximeter holds no key (AS-7), so nothing read out helps attack other devices. *Severity*: none to health.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:N/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:N/XIL:N/XAH:N/XAL:N`
+
+**T-16**, a crafted packet exploits a bug. Scored for a bug that exists and, by the rubric's rule that the attacker has full knowledge, is known. *Impact*: code running on the oximeter can do anything it can.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-17**, a crash or hang stops monitoring. Scored for a crash an attacker in range can trigger at will. *Severity*: with no watchdog and no alarm at the gateway, monitoring stops silently until someone notices, as T-10.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:N/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:N/XIL:N/XAH:Y/XAL:NA`
+
+**T-18**, no security events are recorded: as T-04, for every attack on the device.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:N/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:L/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:N/XIL:Y/XAH:N/XAL:N`
+
+**T-19**, a fake sensor, or false signals on its bus. *Attack vector*: the case must be opened, so not directly accessible (Q5.1). *Impact*: what the sensor reports is what the oximeter measures, so false readings or none. *Severity*: as T-08.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-20**, the console logs readings and limit changes. *Attack vector*: a serial adapter plugged into the console's port, a human-user interface (Q5.1). *Severity*: none to health.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:N/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:N/XIL:N/XAH:N/XAL:N`
+
+### The bedside gateway
+
+| Threat | Vector | Score | Exploitability | Severity | Risk |
+|---|---|---|---|---|---|
+| T-21 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:C/C:N/I:H/A:N` | 5.3 | 0.9 Low | Catastrophic | controlled |
+| T-22 (design) | `CVSS:3.0/AV:L/AC:L/PR:H/UI:N/S:C/C:H/I:H/A:H` | 8.2 | 1.5 Medium | Catastrophic | **uncontrolled** |
+| T-23 (design) | `CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:C/C:N/I:N/A:H` | 8.6 | 3.9 High | Catastrophic | **uncontrolled** |
+| T-24 (design) | `CVSS:3.0/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:N/A:N` | 5.9 | 2.2 Medium | None | controlled |
+
+**T-21**, someone at the gateway sets limits. *Attack vector*: the hub's shell, on its serial port, a human-user interface (Q5.1). *Scope*: the vulnerable component is the gateway and the impacted one the oximeter, as in the rubric's example of a programmer that reprograms a pump. *Severity*: as T-01.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:H/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:Y/XIL:NA/XAH:N/XAL:N`
+
+**T-22**, a compromised gateway. Scored as the step after the compromise, as the rubric directs for attack chains: the attacker runs code on the gateway with its privileges. *Privileges*: the gateway's software runs with system-level privileges. *Scope*: what it relays reaches the oximeter and the backend. *Severity*: as T-01, for the gateway's patient.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:N/XACL:Y/XPRL:Y/XPRZ:Y/XPRS:Y/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-23**, the gateway goes offline. *Attack vector*: over IP, which the rubric rates Network even inside a home or hospital network. *Privileges*: the gateway has users, but stopping it needs none. *Severity*: as T-10.
+
+Rubric answers: `XAVN:Y/XAVT:Y/XAVW:NA/XAVR:NA/XAVP:NA/XACL:Y/XPRL:Y/XPRZ:N/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:N/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:N/XIL:N/XAH:Y/XAL:NA`
+
+**T-24**, health data read from the gateway. *Attack complexity*: reading another device's traffic on a switched or encrypted network takes a man in the middle; reading its storage takes the device in hand, which scores lower. *Severity*: none to health.
+
+Rubric answers: `XAVN:Y/XAVT:Y/XAVW:NA/XAVR:NA/XAVP:NA/XACL:N/XPRL:Y/XPRZ:N/XPRS:NA/XUI:N/XS:N/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:N/XIL:N/XAH:N/XAL:N`
+
+### The network path and the backend
+
+| Threat | Vector | Score | Exploitability | Severity | Risk |
+|---|---|---|---|---|---|
+| T-25 (design) | `CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H` | 10.0 | 3.9 High | Catastrophic | **uncontrolled** |
+| T-26 (design) | `CVSS:3.0/AV:N/AC:H/PR:N/UI:N/S:C/C:H/I:H/A:H` | 9.0 | 2.2 Medium | Catastrophic | **uncontrolled** |
+| T-27 (design) | `CVSS:3.0/AV:N/AC:L/PR:L/UI:N/S:C/C:H/I:H/A:N` | 9.6 | 3.1 High | Catastrophic | **uncontrolled** |
+| T-28 (design) | `CVSS:3.0/AV:L/AC:L/PR:H/UI:N/S:C/C:H/I:H/A:H` | 8.2 | 1.5 Medium | Catastrophic | **uncontrolled** |
+| T-29 (design) | `CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N` | 7.5 | 3.9 High | None | controlled |
+| T-30 (design) | `CVSS:3.0/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:L/A:N` | 4.3 | 2.8 High | None | controlled |
+| T-31 (design) | `CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:C/C:N/I:N/A:H` | 8.6 | 3.9 High | Catastrophic | **uncontrolled** |
+
+**T-25**, a fake backend or a fake gateway. Without authentication between them, a fake gateway needs nothing but the backend's address, the worse of the two directions. *Integrity*: invented readings recorded against a real patient (Q1.I High). *Severity*: forged limits, as T-01.
+
+Rubric answers: `XAVN:Y/XAVT:Y/XAVW:NA/XAVR:NA/XAVP:NA/XACL:Y/XPRL:Y/XPRZ:N/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:H/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-26**, traffic altered or read in transit. *Attack complexity*: a man in the middle. *Confidentiality*: a hospital network carries many gateways' traffic, so 500 patients or more (Q1.1.C). *Severity*: as T-09, for many patients.
+
+Rubric answers: `XAVN:Y/XAVT:Y/XAVW:NA/XAVR:NA/XAVP:NA/XACL:N/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:Y/XIP:N/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-27**, a stolen clinician login. Scored as the step after the theft: the attacker holds a clinician's account. *Privileges*: a clinician's, not an administrator's. *Scope*: the backend reaches the oximeters' limits, as T-21's programmer does. *Severity*: as T-01, for every patient the account reaches.
+
+Rubric answers: `XAVN:Y/XAVT:Y/XAVW:NA/XAVR:NA/XAVP:NA/XACL:Y/XPRL:Y/XPRZ:Y/XPRS:N/XUI:N/XS:Y/XCP:H/XCPM:Y/XIP:N/XAP:N/XCD:H/XID:H/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:N/XAL:N`
+
+**T-28**, a compromised backend: as T-22, for every patient. *Integrity*: records can be made to refer to another patient (Q1.I High).
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:N/XACL:Y/XPRL:Y/XPRZ:Y/XPRS:Y/XUI:N/XS:Y/XCP:H/XCPM:Y/XIP:H/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-29**, the backend's database is breached. *Severity*: none to health, though every patient's health data is disclosed: a privacy harm on the scale that brings breach notification (Q1.1.C), which this assessment of patient harm doesn't weigh.
+
+Rubric answers: `XAVN:Y/XAVT:Y/XAVW:NA/XAVR:NA/XAVP:NA/XACL:Y/XPRL:Y/XPRZ:N/XPRS:NA/XUI:N/XS:N/XCP:H/XCPM:Y/XIP:N/XAP:N/XCD:H/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:N/XIL:N/XAH:N/XAL:N`
+
+**T-30**, changes aren't attributed: as T-04, at the backend. *Privileges*: whoever acts unattributed holds an account.
+
+Rubric answers: `XAVN:Y/XAVT:Y/XAVW:NA/XAVR:NA/XAVP:NA/XACL:Y/XPRL:Y/XPRZ:Y/XPRS:N/XUI:N/XS:N/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:L/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:N/XIL:Y/XAH:N/XAL:N`
+
+**T-31**, the backend goes down. *Severity*: no remote alarms for any patient, as T-10.
+
+Rubric answers: `XAVN:Y/XAVT:Y/XAVW:NA/XAVR:NA/XAVP:NA/XACL:Y/XPRL:Y/XPRZ:N/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:N/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:N/XIL:N/XAH:Y/XAL:NA`
+
+### Updates, signing and the supply chain
+
+| Threat | Vector | Score | Exploitability | Severity | Risk |
+|---|---|---|---|---|---|
+| T-33 (design) | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H` | 9.6 | 2.8 High | Catastrophic | **uncontrolled** |
+| T-34 (design) | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H` | 9.6 | 2.8 High | Catastrophic | **uncontrolled** |
+| T-35 (design) | `CVSS:3.0/AV:L/AC:L/PR:H/UI:N/S:C/C:H/I:H/A:H` | 8.2 | 1.5 Medium | Catastrophic | **uncontrolled** |
+| T-36 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H` | 9.6 | 2.8 High | Catastrophic | **uncontrolled** |
+| T-37 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N` | 0.0 | 0.9 Low | None | controlled |
+
+T-32, that the oximeter can't be updated in the field, isn't scored: it isn't an attack itself, but the reason the others can't be fixed. It raises the exploitability of T-16 and T-36 over the device's life, which the method's lifecycle rule covers, and the [updatability view](updatability.md) answers it.
+
+**T-33**, a forged image through the update path. The baseline has no update path, so scored against the design without its controls: the oximeter takes any image over Bluetooth, which scores higher than the same image pushed by a man in the middle on the network. *Severity*: as T-14, on every device.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-34**, an old image installed again. Without signing, an old image needs nothing a forged one doesn't, so it scores as T-33. The threat differs only once images are signed.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-35**, the signing key is stolen or misused. Scored as the step after the theft, as T-22: someone holds the key on the build system. *Confidentiality*: firmware every device runs reaches every patient (Q1.1.C). *Severity*: as T-33.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:N/XACL:Y/XPRL:Y/XPRZ:Y/XPRS:Y/XUI:N/XS:Y/XCP:H/XCPM:Y/XIP:N/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-36**, a flaw in a third-party component: scored as T-16, which it can be.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-37**, a device passed on with the last patient's data. At baseline nothing outlives a reset (T-06), so there's nothing to find: no impact, and a score of 0. The threat appears with the controls that keep things in flash, and is scored after them.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:N/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:N/XIL:N/XAH:N/XAL:N`
