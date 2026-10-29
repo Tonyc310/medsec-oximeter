@@ -6,14 +6,14 @@ How the oximeter's cybersecurity was tested, in the four kinds of testing FDA's 
 
 ## Result
 
-Every test passed in CI [run 47](https://github.com/Tonyc310/medsec-oximeter/actions/runs/40729609491) at commit [7d80453](https://github.com/Tonyc310/medsec-oximeter/commit/7d80453), on 28 October 2026. CI fails on any failed test, sanitizer report, fuzzer finding, static analysis finding, formatting difference, key found in an image or break in the traceability chain, so a passing run means everything below passed. Each test's name is its expected result: the behavior it checks.
+Every test passed in CI [run 49](https://github.com/Tonyc310/medsec-oximeter/actions/runs/40791201419) at commit [8e3f331](https://github.com/Tonyc310/medsec-oximeter/commit/8e3f331), on 29 October 2026 (UTC). CI fails on any failed test, sanitizer report, fuzzer finding, static analysis finding, formatting difference, key found in an image or break in the traceability chain, so a passing run means everything below passed. Each test's name is its expected result: the behavior it checks.
 
 | Kind | Where | Tests | How |
 |---|---|---|---|
 | End to end | [renode/oximeter.robot](../../renode/oximeter.robot) | 31 | both boards in Renode, joined by a simulated Bluetooth link |
 | Secure boot | [renode/boot.robot](../../renode/boot.robot) | 5 | the oximeter booting through MCUboot in Renode |
 | Simulation models | `flash.robot`, `ccm.robot`, `radio.robot`, `sensor.robot` in [renode/](../../renode/) | 12 | the models this project adds to Renode or fixes, against their specifications or Zephyr's own driver tests |
-| Unit, host | [tests/](../../tests/) | 56 | `core/` under AddressSanitizer and UndefinedBehaviorSanitizer |
+| Unit, host | [tests/](../../tests/) | 58 | `core/` under AddressSanitizer and UndefinedBehaviorSanitizer |
 | Unit, `native_sim` | `tests/` in [app/](../../app/tests/), [hub/](../../hub/tests/), [common/](../../common/tests/) | 28 | code that needs Zephyr, run as a program on the PC |
 | Fuzzing | [fuzz/](../../fuzz/) | 4 targets | libFuzzer, a minute each, under the same sanitizers |
 | Tools | [tools/tests/](../../tools/tests/) | 21 | pytest |
@@ -32,7 +32,7 @@ What the simulation can't show:
 
 [controls.md](controls.md) gives each control's requirement and names the tests that verify it. Every built control names at least one test, and every test named exists: the traceability check fails CI otherwise. The one control not yet built, the debug-port lock (C-11), has no test; it needs the DK.
 
-The unit tests check both sides of the ranges the code enforces, such as the alarm limits' bounds and the pulse range, with the gaps under [Open items](#open-items).
+The unit tests check both sides of the ranges and thresholds the code enforces, such as the alarm limits' bounds, the pulse range and the weakest pulse it measures, but for the rhythm check's threshold ([Open items](#open-items)).
 
 ## Threat mitigation
 
@@ -79,6 +79,7 @@ None yet. The developer wrote every test here, knowing the design; FDA asks for 
 | The hub took up to 4 s to notice a silent oximeter, beyond the 2 s C-19 requires | "Notices A Silent Oximeter Within Two Seconds" | [7d80cc8](https://github.com/Tonyc310/medsec-oximeter/commit/7d80cc8) |
 | The firmware read one sensor sample per interrupt, so any delay left samples waiting for good. Once the sensor's FIFO had filled, every flash erase lost samples: 43% of them during an update | flash erases timed as the chip times them, with the sensor model's FIFO pointers | [5cdfa5e](https://github.com/Tonyc310/medsec-oximeter/commit/5cdfa5e) |
 | A reading that spanned samples the sensor lost would be skewed | the same | [2bcd209](https://github.com/Tonyc310/medsec-oximeter/commit/2bcd209) |
+| No reading from a pulse under a 0.28% perfusion index, where the README promises one from 0.1%: the threshold was compared with the pulse's RMS, not its peak-to-peak size | testing both sides of the perfusion threshold, 0.09% and 0.11% | [8e3f331](https://github.com/Tonyc310/medsec-oximeter/commit/8e3f331) |
 
 Two more were in the test equipment:
 
@@ -91,4 +92,5 @@ Two more were in the test equipment:
 
 - **On the DK**: the debug-port lock (C-11) and what IN133 leaves open on the board's revision; the timing the simulation only models, such as flash stalls, link timing and the gap in monitoring after an update; and penetration testing.
 - **A second update with a real gateway**: the hub gives up on a request after 5 s, and in one probe it timed out while the oximeter erased the old update's slot. The tests never have.
-- **Tests not yet written**: a fake oximeter (T-08); a failed save of the alarm limits (C-16); and boundary cases no unit test checks today, each shown by a planted bug that every unit test passes: the high byte of the pulse limits, a device key erased but for its last byte, and the accepting side of the oximetry analysis's perfusion and periodicity thresholds.
+- **Readings in noise**: with random noise added to a steady 72 bpm pulse, in eight runs with different noise, the oximeter reads within 1 bpm while the noise carries under a tenth of the pulse's power. Beyond that some readings are 3 to 5 bpm high, one read half the rate, and the rhythm check refuses the signal only once the noise is about as strong as the pulse. The README promises nothing rather than a wrong number. Two causes: the rhythm check accepts a signal too noisy to time to a bpm in four seconds, and the beat is taken at the first bump in the correlation within 90% of its highest, which noise can put before the true peak. Until the analysis is reworked, the rhythm check's threshold has no sharp edge for a test to hold either side of.
+- **Tests not yet written**: a fake oximeter (T-08), and a failed save of the alarm limits (C-16).

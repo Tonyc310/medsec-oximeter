@@ -30,6 +30,8 @@ The analysis lives in [core/](core/), plain C17 with no Zephyr, so the same code
 
 The calibration line, SpO2 = 110 − 25 R, is the textbook one. A real oximeter's comes from a clinical study against arterial blood samples (ISO 80601-2-61), so these readings are illustrative.
 
+Noise is the analysis's weak spot. With random noise added to a steady 72 bpm pulse, it reads within 1 bpm while the noise carries under a tenth of the pulse's power. Beyond that some readings are 3 to 5 bpm high, and the rhythm check refuses the signal only once the noise is about as strong as the pulse: a wrong number where it should show nothing. Reworking the analysis for noise is an [open item](docs/security/test-report.md#open-items).
+
 ## Bluetooth
 
 The oximeter advertises the Bluetooth SIG **Pulse Oximeter Service** and sends a PLX Continuous Measurement notification once a second: SpO2 and pulse rate as IEEE 11073 SFLOATs, with the standard's "not a number" when there's no reading. Only the gateway it's paired with can subscribe.
