@@ -3,12 +3,15 @@
 
 Reads each table in docs/security/risk-assessment.md that has Vector and Severity columns, and
 fills in each row's base score, its exploitability subscore and level, and whether the risk is
-controlled under the method's acceptance criteria. Fails, naming the row, for a vector or a
-severity it can't read. With --check, it also fails for any row that isn't up to date.
+controlled under the method's acceptance criteria. Each row's vector must be the one its threat's
+answers to MITRE's rubric give, in the same section. Fails, naming the row, for a vector, answers
+or a severity it can't read or that disagree. With --check, it also fails for any row that isn't
+up to date.
 """
 
 import argparse
 import math
+import re
 import sys
 from pathlib import Path
 
@@ -34,6 +37,32 @@ BASE_METRICS = {
     "A": tuple(IMPACT),
 }
 
+# The rubric's questions, by their extended-vector codes, and the answers each allows. Whether
+# PHI can be read has no Low: the rubric treats a privacy breach as binary.
+YES_NO = ("Y", "N", "U")
+SKIPPABLE = (*YES_NO, "NA")
+CONFIDENTIALITY = ("XCP", "XCD", "XCT", "XCW", "XCS", "XCO")
+INTEGRITY = ("XIP", "XID", "XIT", "XIW", "XIS", "XIO")
+AVAILABILITY = ("XAP", "XAD", "XAT", "XAW", "XAS", "XAO")
+SUMMARIES = (("XCH", "XCL"), ("XIH", "XIL"), ("XAH", "XAL"))
+QUESTIONS = {
+    "XAVN": YES_NO,
+    **dict.fromkeys(("XAVT", "XAVW", "XAVR", "XAVP"), SKIPPABLE),
+    "XACL": YES_NO,
+    "XPRL": YES_NO,
+    **dict.fromkeys(("XPRZ", "XPRS"), SKIPPABLE),
+    "XUI": YES_NO,
+    "XS": YES_NO,
+    **dict.fromkeys(CONFIDENTIALITY + INTEGRITY + AVAILABILITY, ("H", "L", "N", "U")),
+    "XCP": ("H", "N", "U"),
+    "XCPM": SKIPPABLE,
+    **dict.fromkeys(("XCH", "XIH", "XAH"), ("Y", "N")),
+    **dict.fromkeys(("XCL", "XIL", "XAL"), ("Y", "N", "NA")),
+}
+RUBRIC_ANSWERS = re.compile(r"^Rubric answers: `([^`]+)`")
+THREAT_NOTE = re.compile(r"^\*\*(T-\d+)\*\*")
+THREAT = re.compile(r"T-\d+")
+
 SEVERITIES = ("None", "Negligible", "Minor", "Serious", "Critical", "Catastrophic")
 # The acceptance criteria: the least severe harm each exploitability level makes uncontrolled.
 UNCONTROLLED_FROM = {"High": "Serious", "Medium": "Critical", "Low": None}
@@ -41,6 +70,10 @@ UNCONTROLLED_FROM = {"High": "Serious", "Medium": "Critical", "Low": None}
 
 class VectorError(ValueError):
     """A vector that isn't a CVSS v3.0 base vector."""
+
+
+class AnswerError(ValueError):
+    """Answers to the rubric that are malformed, or that don't give the vector they're with."""
 
 
 def parse(vector: str) -> dict[str, str]:
@@ -61,6 +94,109 @@ def parse(vector: str) -> dict[str, str]:
     if missing:
         raise VectorError(f"has no {missing[0]}")
     return metrics
+
+
+def parse_answers(text: str) -> dict[str, str]:
+    """Return the rubric's answers in an extended vector, by question code."""
+    answers: dict[str, str] = {}
+    for part in text.split("/"):
+        code, _, value = part.partition(":")
+        if code in answers:
+            raise AnswerError(f"gives {code} twice")
+        if code not in QUESTIONS:
+            raise AnswerError(f"has {part}, which the rubric doesn't ask")
+        if value not in QUESTIONS[code]:
+            raise AnswerError(f"has {part}, which the rubric doesn't allow")
+        answers[code] = value
+    missing = [code for code in QUESTIONS if code not in answers]
+    if missing:
+        raise AnswerError(f"has no {missing[0]}")
+    return answers
+
+
+# Each metric from its questions, by the rubric's decision flows. An unknown answer takes the
+# branch with the higher score, as the rubric directs, and a question the flow doesn't reach is
+# ignored, whatever its answer.
+
+
+def attack_vector(answers: dict[str, str]) -> str:
+    """Return the Attack Vector the answers give."""
+    if answers["XAVN"] == "N":
+        return "P" if answers["XAVP"] == "Y" else "L"
+    if answers["XAVN"] == "U" or answers["XAVT"] != "N":
+        return "N"
+    return "L" if answers["XAVW"] == "Y" and answers["XAVR"] == "Y" else "A"
+
+
+def attack_complexity(answers: dict[str, str]) -> str:
+    """Return the Attack Complexity the answers give."""
+    return "H" if answers["XACL"] == "N" else "L"
+
+
+def privileges_required(answers: dict[str, str]) -> str:
+    """Return the Privileges Required the answers give."""
+    if answers["XPRL"] == "Y" and answers["XPRZ"] == "Y":
+        return {"Y": "H", "N": "L"}.get(answers["XPRS"], "N")
+    return "N"
+
+
+def user_interaction(answers: dict[str, str]) -> str:
+    """Return the User Interaction the answers give."""
+    return "R" if answers["XUI"] == "Y" else "N"
+
+
+def scope(answers: dict[str, str]) -> str:
+    """Return the Scope the answers give."""
+    return "U" if answers["XS"] == "N" else "C"
+
+
+def impact(answers: dict[str, str], questions: tuple[str, ...]) -> str:
+    """Return the impact that the answers to one impact's questions give."""
+    given = [answers[question] for question in questions]
+    if "H" in given or "U" in given:
+        return "H"
+    return "L" if "L" in given else "N"
+
+
+def impacts(answers: dict[str, str]) -> tuple[str, str, str]:
+    """Return the Confidentiality, Integrity and Availability impacts the answers give."""
+    return (
+        impact(answers, CONFIDENTIALITY),
+        impact(answers, INTEGRITY),
+        impact(answers, AVAILABILITY),
+    )
+
+
+def summaries(answers: dict[str, str]) -> dict[str, str]:
+    """Return the answers to the rubric's summary questions that the other answers give."""
+    expected = {}
+    for (high, low), value in zip(SUMMARIES, impacts(answers), strict=True):
+        expected[high] = "Y" if value == "H" else "N"
+        expected[low] = "NA" if value == "H" else ("Y" if value == "L" else "N")
+    return expected
+
+
+def vector_from(answers: dict[str, str]) -> str:
+    """Return the CVSS v3.0 base vector the answers give."""
+    confidentiality, integrity, availability = impacts(answers)
+    return (
+        f"{PREFIX}AV:{attack_vector(answers)}/AC:{attack_complexity(answers)}"
+        f"/PR:{privileges_required(answers)}/UI:{user_interaction(answers)}/S:{scope(answers)}"
+        f"/C:{confidentiality}/I:{integrity}/A:{availability}"
+    )
+
+
+def agree(vector: str, text: str) -> None:
+    """Raise AnswerError unless the answers in `text` are consistent and give `vector`."""
+    answers = parse_answers(text)
+    for code, value in summaries(answers).items():
+        if answers[code] != value:
+            raise AnswerError(f"{code} should be {value}")
+    stated = parse(vector)
+    derived = parse(vector_from(answers))
+    differ = [f"{name}:{value}" for name, value in derived.items() if stated[name] != value]
+    if differ:
+        raise AnswerError(f"its answers give {', '.join(differ)}")
 
 
 def round_up(value: float) -> float:
@@ -125,13 +261,30 @@ def cells(line: str) -> list[str]:
     return [cell.strip() for cell in line.strip().strip("|").split("|")]
 
 
-def scored(columns: list[str], row: list[str]) -> str:
+def rubric_answers(lines: list[str]) -> dict[tuple[str, str], str]:
+    """Return each threat's rubric answers, by the section they're in and the threat's ID."""
+    found = {}
+    section = threat = ""
+    for line in lines:
+        if line.startswith("## "):
+            section = line
+        elif note := THREAT_NOTE.match(line):
+            threat = note.group(1)
+        elif answers := RUBRIC_ANSWERS.match(line):
+            found[(section, threat)] = answers.group(1)
+    return found
+
+
+def scored(columns: list[str], row: list[str], answers: str | None) -> str:
     """Return a risk table row with its score, exploitability and risk filled in."""
     record = dict(zip(columns, row, strict=True))
     vector = record["Vector"].strip("`")
     severity = record["Severity"]
     if severity not in SEVERITIES:
         raise ValueError(f"{severity} isn't a severity the method defines")
+    if answers is None:
+        raise AnswerError("has no rubric answers")
+    agree(vector, answers)
     points = exploitability(vector)
     record["Score"] = f"{base_score(vector):.1f}"
     record["Exploitability"] = f"{points:.1f} {level(points)}"
@@ -143,9 +296,13 @@ def scored(columns: list[str], row: list[str]) -> str:
 def fill(text: str) -> tuple[str, list[str]]:
     """Return `text` with each risk row filled in, and each row that can't be scored."""
     lines = text.split("\n")
+    answers = rubric_answers(lines)
     problems = []
+    section = ""
     columns: list[str] = []
     for number, line in enumerate(lines):
+        if line.startswith("## "):
+            section = line
         if not line.startswith("|"):
             columns = []
             continue
@@ -153,8 +310,11 @@ def fill(text: str) -> tuple[str, list[str]]:
         if "Vector" in row and "Severity" in row:
             columns = row
         elif columns and not set(line) <= set("|-: "):
+            threat = THREAT.match(row[0])
             try:
-                lines[number] = scored(columns, row)
+                lines[number] = scored(
+                    columns, row, answers.get((section, threat.group() if threat else row[0]))
+                )
             except ValueError as error:
                 problems.append(f"{row[0]}: {error}")
     return "\n".join(lines), problems

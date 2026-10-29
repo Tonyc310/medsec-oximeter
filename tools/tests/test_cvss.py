@@ -15,13 +15,50 @@ HEAD = dedent("""\
 T_01 = "| T-01 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N` |"
 T_05 = "| T-05 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N` |"
 
-TABLE = HEAD + T_01 + " | | Catastrophic | |\n" + T_05 + " | | None | |\n"
+# The rubric's answers for an attack over Bluetooth, at will, on a device with no logins, that
+# changes nothing beyond the device and has no impact; each test changes what it needs.
+BASE = {
+    "XAVN": "Y",
+    "XAVT": "N",
+    "XAVW": "Y",
+    "XAVR": "N",
+    "XAVP": "NA",
+    "XACL": "Y",
+    "XPRL": "N",
+    "XPRZ": "NA",
+    "XPRS": "NA",
+    "XUI": "N",
+    "XS": "N",
+    **{code: "N" for code in "XCP XIP XAP XCD XID XAD XCT XIT XAT XCW XIW XAW".split()},
+    **{code: "N" for code in "XCS XIS XAS XCO XIO XAO".split()},
+    "XCPM": "NA",
+    **{code: "N" for code in "XCH XCL XIH XIL XAH XAL".split()},
+}
+
+
+def answers(**changes: str) -> dict[str, str]:
+    return {**BASE, **changes}
+
+
+def extended(**changes: str) -> str:
+    return "/".join(f"{code}:{value}" for code, value in answers(**changes).items())
+
+
+T_01_ANSWERS = extended(XID="H", XIH="Y", XIL="NA")
+T_05_ANSWERS = extended(XCD="L", XCL="Y")
+NOTES = (
+    f"\n**T-01**, a note.\n\nRubric answers: `{T_01_ANSWERS}`\n"
+    f"\n**T-05**, a note.\n\nRubric answers: `{T_05_ANSWERS}`\n"
+)
+
+TABLE = HEAD + T_01 + " | | Catastrophic | |\n" + T_05 + " | | None | |\n" + NOTES
 FILLED = (
     HEAD
     + T_01
     + " 6.5 | 2.8 High | Catastrophic | **uncontrolled** |\n"
     + T_05
     + " 4.3 | 2.8 High | None | controlled |\n"
+    + NOTES
 )
 
 
@@ -149,3 +186,137 @@ def test_names_a_row_it_can_not_score(problem: str, old: str, new: str, named: s
     assert old in TABLE, problem
 
     assert cvss.fill(TABLE.replace(old, new))[1] == [named]
+
+
+@pytest.mark.parametrize(
+    ("case", "changes", "vector"),
+    [
+        ("an IP network", {"XAVT": "Y", "XAVW": "NA", "XAVR": "NA"}, "N"),
+        ("wireless within about 10 feet", {"XAVR": "Y"}, "L"),
+        ("wireless beyond 10 feet", {"XAVR": "N"}, "A"),
+        ("wireless of unknown range", {"XAVR": "U"}, "A"),
+        ("a wired link that isn't IP, whatever Q4 says", {"XAVW": "N", "XAVR": "Y"}, "A"),
+        ("a link that may be wireless, whatever Q4 says", {"XAVW": "U", "XAVR": "Y"}, "A"),
+        ("a protocol that may be IP", {"XAVT": "U", "XAVW": "NA", "XAVR": "NA"}, "N"),
+        ("maybe a protocol, whatever follows", {"XAVN": "U", "XAVR": "Y"}, "N"),
+        (
+            "physical contact",
+            {"XAVN": "N", "XAVT": "NA", "XAVW": "NA", "XAVR": "NA", "XAVP": "Y"},
+            "P",
+        ),
+        (
+            "shell access",
+            {"XAVN": "N", "XAVT": "NA", "XAVW": "NA", "XAVR": "NA", "XAVP": "N"},
+            "L",
+        ),
+        (
+            "maybe physical contact",
+            {"XAVN": "N", "XAVT": "NA", "XAVW": "NA", "XAVR": "NA", "XAVP": "U"},
+            "L",
+        ),
+    ],
+)
+def test_derives_attack_vector(case: str, changes: dict[str, str], vector: str) -> None:
+    assert cvss.attack_vector(answers(**changes)) == vector, case
+
+
+@pytest.mark.parametrize(("answer", "vector"), [("Y", "L"), ("N", "H"), ("U", "L")])
+def test_derives_attack_complexity(answer: str, vector: str) -> None:
+    assert cvss.attack_complexity(answers(XACL=answer)) == vector
+
+
+@pytest.mark.parametrize(
+    ("case", "changes", "vector"),
+    [
+        ("no authorization model, whatever follows", {"XPRL": "N", "XPRZ": "Y", "XPRS": "Y"}, "N"),
+        (
+            "maybe an authorization model, whatever follows",
+            {"XPRL": "U", "XPRZ": "Y", "XPRS": "Y"},
+            "N",
+        ),
+        ("not authorized, whatever Q3 says", {"XPRL": "Y", "XPRZ": "N", "XPRS": "Y"}, "N"),
+        ("maybe authorized, whatever Q3 says", {"XPRL": "Y", "XPRZ": "U", "XPRS": "Y"}, "N"),
+        ("an ordinary user", {"XPRL": "Y", "XPRZ": "Y", "XPRS": "N"}, "L"),
+        ("system-level", {"XPRL": "Y", "XPRZ": "Y", "XPRS": "Y"}, "H"),
+        ("a level not known", {"XPRL": "Y", "XPRZ": "Y", "XPRS": "U"}, "N"),
+    ],
+)
+def test_derives_privileges_required(case: str, changes: dict[str, str], vector: str) -> None:
+    assert cvss.privileges_required(answers(**changes)) == vector, case
+
+
+@pytest.mark.parametrize(("answer", "vector"), [("Y", "R"), ("N", "N"), ("U", "N")])
+def test_derives_user_interaction(answer: str, vector: str) -> None:
+    assert cvss.user_interaction(answers(XUI=answer)) == vector
+
+
+@pytest.mark.parametrize(("answer", "vector"), [("Y", "C"), ("N", "U"), ("U", "C")])
+def test_derives_scope(answer: str, vector: str) -> None:
+    assert cvss.scope(answers(XS=answer)) == vector
+
+
+@pytest.mark.parametrize(
+    ("case", "changes", "impacts"),
+    [
+        ("confidentiality from its own questions", {"XCO": "H"}, ("H", "N", "N")),
+        ("integrity from its own questions", {"XIW": "H"}, ("N", "H", "N")),
+        ("availability from its own questions", {"XAP": "H"}, ("N", "N", "H")),
+        ("unknown as High", {"XID": "U"}, ("N", "H", "N")),
+        ("Low when nothing is High", {"XCD": "L", "XCW": "L"}, ("L", "N", "N")),
+        ("High over Low", {"XAD": "L", "XAS": "H"}, ("N", "N", "H")),
+        ("none", {}, ("N", "N", "N")),
+    ],
+)
+def test_derives_each_impact_from_its_own_questions(
+    case: str, changes: dict[str, str], impacts: tuple[str, str, str]
+) -> None:
+    assert cvss.impacts(answers(**changes)) == impacts, case
+
+
+@pytest.mark.parametrize(
+    ("problem", "text", "message"),
+    [
+        (
+            "a question the rubric doesn't ask",
+            extended() + "/XZZ:Y",
+            "has XZZ:Y, which the rubric doesn't ask",
+        ),
+        (
+            "an answer it doesn't allow",
+            extended(XCP="L"),
+            "has XCP:L, which the rubric doesn't allow",
+        ),
+        ("a missing answer", extended().replace("XACL:Y/", ""), "has no XACL"),
+        ("an answer twice", extended() + "/XAVN:Y", "gives XAVN twice"),
+    ],
+)
+def test_refuses_malformed_answers(problem: str, text: str, message: str) -> None:
+    with pytest.raises(cvss.AnswerError, match=f"^{message}$"):
+        cvss.parse_answers(text)
+
+
+def test_names_a_vector_its_answers_dont_give() -> None:
+    table = TABLE.replace(T_01_ANSWERS, extended(XACL="N", XID="H", XIH="Y", XIL="NA"))
+
+    assert cvss.fill(table)[1] == ["T-01: its answers give AC:H"]
+
+
+def test_names_a_derived_answer_that_disagrees() -> None:
+    table = TABLE.replace(T_01_ANSWERS, extended(XID="H", XIL="NA"))
+
+    assert cvss.fill(table)[1] == ["T-01: XIH should be Y"]
+
+
+def test_names_a_row_without_answers() -> None:
+    table = TABLE.replace(f"\n**T-01**, a note.\n\nRubric answers: `{T_01_ANSWERS}`\n", "")
+
+    assert cvss.fill(table)[1] == ["T-01: has no rubric answers"]
+
+
+def test_matches_answers_within_their_section() -> None:
+    after = TABLE.replace("# Risk assessment", "## After controls").replace(
+        "AC:L/PR:N/UI:N/S:U/C:N/I:H", "AC:H/PR:N/UI:N/S:U/C:N/I:H"
+    )
+    after = after.replace(T_01_ANSWERS, extended(XACL="N", XID="H", XIH="Y", XIL="NA"))
+
+    assert cvss.fill("## Before controls\n" + TABLE + after)[1] == []
