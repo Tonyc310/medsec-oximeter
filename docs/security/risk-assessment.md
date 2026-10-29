@@ -45,7 +45,7 @@ Each threat takes the worst harm it could credibly cause in either use environme
 
 Two rules override the table. A vulnerability in a component that's listed in CISA's Known Exploited Vulnerabilities catalog is uncontrolled whatever its level, since FDA's guidance says those should be designed out. And an uncontrolled risk needs a control, or a stated reason why the device can't have one; it's never accepted as it stands.
 
-**Before and after controls.** *Before* is the device the threat model describes: the Phase 2 baseline, with no security controls. *After* counts only controls that are built, and says for each which metric it changes and why. A planned control, such as the debug-port lock (C-11), doesn't count until it's built. Threats against elements that aren't built yet, such as the backend, are scored against their design and marked so. A threat with no control keeps its score from before.
+**Before and after controls.** *Before* is the device the threat model describes: the Phase 2 baseline, with no security controls. *After* counts only controls that are built, and says for each which metric it changes and why. A planned control, such as the debug-port lock (C-11), doesn't count until it's built. Threats against elements that aren't built yet, such as the backend, are scored against their design and marked so. A threat with no control keeps its score from before. Where the controls mean a threat now needs a key they keep secret, what's left is the way to that key, so the threat is scored for that way, as the rubric directs scoring the underlying vulnerability. An oximeter's own keys can be read out with the device in hand until the debug-port lock is built; the release key is on no device, so the way to it is T-35's; and the backend's masters are the backend's own threats.
 
 **To the safety risk assessment.** FDA's guidance treats security and safety risk management as separate but connected processes. A threat whose harm is a hazardous situation, such as an alarm that doesn't sound, a wrong reading shown or monitoring that stops unnoticed, passes to the safety risk assessment as one more cause of that hazardous situation, with its exploitability after controls, and ISO 14971's analysis takes it from there. This project has no safety risk file, so the assessment lists the threats that would pass, with the hazardous situation each would pass as.
 
@@ -266,3 +266,219 @@ Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:
 **T-37**, a device passed on with the last patient's data. At baseline nothing outlives a reset (T-06), so there's nothing to find: no impact, and a score of 0. The threat appears with the controls that keep things in flash, and is scored after them.
 
 Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:N/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:N/XIL:N/XAH:N/XAL:N`
+
+## After controls
+
+With the controls in [controls.md](controls.md) that are built. Each note says which control changed which metric; a threat no built control stands against keeps its score from before.
+
+### The alarm limits
+
+| Threat | Vector | Score | Exploitability | Severity | Risk |
+|---|---|---|---|---|---|
+| T-01 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:C/C:N/I:H/A:N` | 5.3 | 0.9 Low | Catastrophic | controlled |
+| T-02 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:N` | 7.3 | 0.9 Low | Catastrophic | controlled |
+| T-03 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:C/C:N/I:H/A:N` | 5.3 | 0.9 Low | Catastrophic | controlled |
+| T-04 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N` | 2.4 | 0.9 Low | None | controlled |
+| T-05 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N` | 4.6 | 0.9 Low | None | controlled |
+| T-06 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:C/C:N/I:H/A:H` | 7.3 | 0.9 Low | Catastrophic | controlled |
+
+**T-01**, C-01 and C-04 keep an unpaired device off the link, and C-03 refuses limits without a tag under this oximeter's limits key (C-06), fresh for its challenge. What's left is the key, which can be read out through the open debug port with the device in hand: *attack vector* Physical, not directly accessible (Q5.1). With the key, the rest could be done over the air later. The backend's master is T-28's.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:H/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:Y/XIL:NA/XAH:N/XAL:N`
+
+**T-02**, C-01's out-of-band pairing stops a man in the middle who lacks the pairing key, and C-03's tag covers the limits: as T-01, the keys are what's left.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:L/XID:H/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:N/XAL:N`
+
+**T-03**, C-03 replaces the challenge after every attempt, so a captured command never verifies again: what's left is making a fresh one, as T-01.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:H/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:Y/XIL:NA/XAH:N/XAL:N`
+
+**T-04**, C-13 records every change over the air with the central that made it, C-14 tags each record and C-15 shows one held back. A change with no record now needs flash written through the debug port. A record names a central, not a person; that's T-30's.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:N/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:L/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:N/XIL:Y/XAH:N/XAL:N`
+
+**T-05**, C-04 opens the limits only to the paired gateway's level-4 link: as T-01, the pairing key is what's left.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:N/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:L/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:N/XIL:N/XAH:N/XAL:N`
+
+**T-06**, C-16 keeps the limits through a reset. What's left is C-12's reset for a new patient: anyone holding the device can hold Button 1 for 5 s, a human-user interface (Q5.1), which restores the defaults and shuts the gateway out until the backend allows a new pairing. *Severity*: the gateway notices the silence (C-19) but raises no alarm yet, so as T-10, worse than before; needing the device in hand keeps it Low.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+### Readings and alarms over Bluetooth
+
+| Threat | Vector | Score | Exploitability | Severity | Risk |
+|---|---|---|---|---|---|
+| T-07 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N` | 4.6 | 0.9 Low | None | controlled |
+| T-08 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H` | 7.6 | 0.9 Low | Catastrophic | controlled |
+| T-09 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H` | 7.6 | 0.9 Low | Catastrophic | controlled |
+| T-10 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:C/C:N/I:N/A:H` | 7.4 | 2.8 High | Catastrophic | **uncontrolled** |
+| T-11 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:C/C:N/I:N/A:H` | 7.4 | 2.8 High | Catastrophic | **uncontrolled** |
+| T-12 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H` | 7.6 | 0.9 Low | Catastrophic | controlled |
+| T-13 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N` | 6.5 | 2.8 High | None | controlled |
+
+**T-07**, C-04 opens the readings only to the paired gateway, over C-01's encrypted link: as T-05.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:N/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:N/XIL:N/XAH:N/XAL:N`
+
+**T-08**, C-01: a gateway pairs only with data sealed under the oximeter's own pairing key, so a fake needs a real oximeter's key, read out through its debug port, as T-01. No test plays a fake oximeter yet ([test report](test-report.md#open-items)).
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:L/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-09**, C-01's link is encrypted and authenticated, so a man in the middle needs its keys: as T-01.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-10**, No control yet: C-19 notices the silence within half a second, but raises no alarm. As before.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:N/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:N/XIL:N/XAH:Y/XAL:NA`
+
+**T-11**, No control yet. As before.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:N/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:N/XIL:N/XAH:Y/XAL:NA`
+
+**T-12**, C-01 and C-02: a gateway pairs only with an oximeter whose seal the backend opens for it, so another bed's needs that oximeter's pairing key, as T-08. Staff pairing or resetting the wrong device is a use error, for the safety risk assessment.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:H/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-13**, No control yet. As before.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:N/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:N/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:N/XIL:N/XAH:N/XAL:N`
+
+### The oximeter
+
+| Threat | Vector | Score | Exploitability | Severity | Risk |
+|---|---|---|---|---|---|
+| T-14 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H` | 7.6 | 0.9 Low | Catastrophic | controlled |
+| T-15 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:C/C:H/I:N/A:N` | 5.3 | 0.9 Low | None | controlled |
+| T-16 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H` | 9.6 | 2.8 High | Catastrophic | **uncontrolled** |
+| T-17 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:C/C:N/I:N/A:H` | 7.4 | 2.8 High | Catastrophic | **uncontrolled** |
+| T-18 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N` | 2.4 | 0.9 Low | None | controlled |
+| T-19 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:C/C:N/I:H/A:H` | 7.3 | 0.9 Low | Catastrophic | controlled |
+| T-20 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N` | 4.6 | 0.9 Low | None | controlled |
+
+**T-14**, No control yet: C-08 checks the firmware at every boot, but through the debug port MCUboot itself can be replaced. As before.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-15**, No control yet, and there's more to read: the oximeter now holds its keys (C-06) and keeps its log and limits in flash. *Scope*: the keys let the attacker pass as this oximeter to its gateway and backend. Using them is scored under the threats they serve, T-01 to T-12.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:H/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:N/XIL:N/XAH:N/XAL:N`
+
+**T-16**, C-10's parsers are fuzzed, and C-04 leaves an unpaired device only the device ID and the pairing data. But Zephyr's Bluetooth stack beneath them is reached before pairing, and a bug there scores as before: CVSS rates what a known bug allows, not how likely one is. C-08 keeps it from persisting, and C-22 and C-20 find and fix the known ones.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-17**, C-18 restarts a hung oximeter within 2 s, and C-16 keeps its limits through the restart, but a crash an attacker can trigger repeats at will, so monitoring stays down. As before.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:N/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:N/XIL:N/XAH:Y/XAL:NA`
+
+**T-18**, As T-04.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:N/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:L/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:N/XIL:Y/XAH:N/XAL:N`
+
+**T-19**, No control yet. As before.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-20**, No control yet. As before.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:N/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:N/XIL:N/XAH:N/XAL:N`
+
+### The bedside gateway
+
+| Threat | Vector | Score | Exploitability | Severity | Risk |
+|---|---|---|---|---|---|
+| T-21 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:C/C:N/I:H/A:N` | 5.3 | 0.9 Low | Catastrophic | controlled |
+| T-22 (design) | `CVSS:3.0/AV:L/AC:L/PR:H/UI:N/S:C/C:H/I:H/A:H` | 8.2 | 1.5 Medium | Catastrophic | **uncontrolled** |
+| T-23 (design) | `CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:C/C:N/I:N/A:H` | 8.6 | 3.9 High | Catastrophic | **uncontrolled** |
+| T-24 (design) | `CVSS:3.0/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:N/A:N` | 5.9 | 2.2 Medium | None | controlled |
+
+**T-21**, C-03: the gateway relays limit commands but can't make one, since only the backend holds the master. What's left is the oximeter's limits key, as T-01. The hub here stands in for the backend too and holds its masters, so its shell can still set limits; a real gateway holds none.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:H/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:Y/XIL:NA/XAH:N/XAL:N`
+
+**T-22**, C-03, C-05, C-14 and C-15 stop a compromised gateway forging limits, keeping an update, and editing or holding back the log. Readings and alarms aren't signed end to end, so it can still alter or drop them: the vector is unchanged.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:N/XACL:Y/XPRL:Y/XPRZ:Y/XPRS:Y/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-23**, The gateway isn't built yet, so nothing stands against this: as before.
+
+Rubric answers: `XAVN:Y/XAVT:Y/XAVW:NA/XAVR:NA/XAVP:NA/XACL:Y/XPRL:Y/XPRZ:N/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:N/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:N/XIL:N/XAH:Y/XAL:NA`
+
+**T-24**, The gateway isn't built yet, so nothing stands against this: as before.
+
+Rubric answers: `XAVN:Y/XAVT:Y/XAVW:NA/XAVR:NA/XAVP:NA/XACL:N/XPRL:Y/XPRZ:N/XPRS:NA/XUI:N/XS:N/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:N/XIL:N/XAH:N/XAL:N`
+
+### The network path and the backend
+
+| Threat | Vector | Score | Exploitability | Severity | Risk |
+|---|---|---|---|---|---|
+| T-25 (design) | `CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H` | 10.0 | 3.9 High | Catastrophic | **uncontrolled** |
+| T-26 (design) | `CVSS:3.0/AV:N/AC:H/PR:N/UI:N/S:C/C:H/I:H/A:H` | 9.0 | 2.2 Medium | Catastrophic | **uncontrolled** |
+| T-27 (design) | `CVSS:3.0/AV:N/AC:L/PR:L/UI:N/S:C/C:H/I:H/A:N` | 9.6 | 3.1 High | Catastrophic | **uncontrolled** |
+| T-28 (design) | `CVSS:3.0/AV:L/AC:L/PR:H/UI:N/S:C/C:H/I:H/A:H` | 8.2 | 1.5 Medium | Catastrophic | **uncontrolled** |
+| T-29 (design) | `CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N` | 7.5 | 3.9 High | None | controlled |
+| T-30 (design) | `CVSS:3.0/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:L/A:N` | 4.3 | 2.8 High | None | controlled |
+| T-31 (design) | `CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:C/C:N/I:N/A:H` | 8.6 | 3.9 High | Catastrophic | **uncontrolled** |
+
+**T-25**, The backend isn't built yet, so nothing stands against this: as before.
+
+Rubric answers: `XAVN:Y/XAVT:Y/XAVW:NA/XAVR:NA/XAVP:NA/XACL:Y/XPRL:Y/XPRZ:N/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:H/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-26**, The backend isn't built yet, so nothing stands against this: as before.
+
+Rubric answers: `XAVN:Y/XAVT:Y/XAVW:NA/XAVR:NA/XAVP:NA/XACL:N/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:Y/XIP:N/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-27**, The backend isn't built yet, so nothing stands against this: as before.
+
+Rubric answers: `XAVN:Y/XAVT:Y/XAVW:NA/XAVR:NA/XAVP:NA/XACL:Y/XPRL:Y/XPRZ:Y/XPRS:N/XUI:N/XS:Y/XCP:H/XCPM:Y/XIP:N/XAP:N/XCD:H/XID:H/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:N/XAL:N`
+
+**T-28**, The backend isn't built yet, so nothing stands against this: as before.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:N/XACL:Y/XPRL:Y/XPRZ:Y/XPRS:Y/XUI:N/XS:Y/XCP:H/XCPM:Y/XIP:H/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-29**, The backend isn't built yet, so nothing stands against this: as before.
+
+Rubric answers: `XAVN:Y/XAVT:Y/XAVW:NA/XAVR:NA/XAVP:NA/XACL:Y/XPRL:Y/XPRZ:N/XPRS:NA/XUI:N/XS:N/XCP:H/XCPM:Y/XIP:N/XAP:N/XCD:H/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:N/XIL:N/XAH:N/XAL:N`
+
+**T-30**, The backend isn't built yet, so nothing stands against this: as before.
+
+Rubric answers: `XAVN:Y/XAVT:Y/XAVW:NA/XAVR:NA/XAVP:NA/XACL:Y/XPRL:Y/XPRZ:Y/XPRS:N/XUI:N/XS:N/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:L/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:N/XIL:Y/XAH:N/XAL:N`
+
+**T-31**, The backend isn't built yet, so nothing stands against this: as before.
+
+Rubric answers: `XAVN:Y/XAVT:Y/XAVW:NA/XAVR:NA/XAVP:NA/XACL:Y/XPRL:Y/XPRZ:N/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:N/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:N/XIL:N/XAH:Y/XAL:NA`
+
+### Updates, signing and the supply chain
+
+| Threat | Vector | Score | Exploitability | Severity | Risk |
+|---|---|---|---|---|---|
+| T-33 (design) | `CVSS:3.0/AV:L/AC:L/PR:H/UI:N/S:C/C:H/I:H/A:H` | 8.2 | 1.5 Medium | Catastrophic | **uncontrolled** |
+| T-34 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H` | 7.6 | 0.9 Low | Catastrophic | controlled |
+| T-35 (design) | `CVSS:3.0/AV:L/AC:L/PR:H/UI:N/S:C/C:H/I:H/A:H` | 8.2 | 1.5 Medium | Catastrophic | **uncontrolled** |
+| T-36 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H` | 9.6 | 2.8 High | Catastrophic | **uncontrolled** |
+| T-37 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N` | 4.6 | 0.9 Low | None | controlled |
+
+T-32 is answered by C-20: the oximeter can now be updated over Bluetooth.
+
+**T-33**, C-08, C-09 and C-20: the oximeter runs and keeps only an image signed with the release key, which is on no device (the key check). A forged image needs that key, so this takes T-35's way to it, and its score.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:N/XACL:Y/XPRL:Y/XPRZ:Y/XPRS:Y/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-34**, C-21: MCUboot erases an update whose security counter is below the running image's. What's left is the debug port, through which, as MCUboot's documentation notes, the check can be bypassed.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-35**, No control yet: one release key per checkout, never committed, and the offline signing service is planned. As before.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:N/XACL:Y/XPRL:Y/XPRZ:Y/XPRS:Y/XUI:N/XS:Y/XCP:H/XCPM:Y/XIP:N/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-36**, C-22 finds the known vulnerabilities in every component each week, and C-20 delivers the fix. Until it's delivered, a known one scores as T-16.
+
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
+
+**T-37**, C-12's reset deletes the bond and the limits, so the old gateway can't connect again. The security log stays, as evidence, and holds the last patient's limit changes, which anyone holding the device can read through the debug port. Staff forgetting the reset is a use error, for the safety risk assessment.
+
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:N/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:L/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:N/XIL:N/XAH:N/XAL:N`
