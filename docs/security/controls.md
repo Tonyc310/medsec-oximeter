@@ -1,6 +1,6 @@
 # Security controls
 
-The controls built against the [threat model](threat-model.md), grouped the way FDA's premarket guidance groups them (Appendix 1). For each one: what it must do, how it's built, the threats it addresses and the tests that verify it. [traceability.md](traceability.md) traces each threat to its controls and their tests. The threat model stays the Phase 2 baseline, before any control. The [test report](test-report.md) records the result, and the risk assessment rates what's left.
+The controls built against the [threat model](threat-model.md), grouped the way FDA's premarket guidance groups them (Appendix 1). For each one: what it must do, how it's built, the threats it addresses and the tests that verify it. [traceability.md](traceability.md) traces each threat to its controls and their tests. The threat model stays the Phase 2 baseline, before any control. The [test report](test-report.md) records the result, and the [risk assessment](risk-assessment.md) rates what's left.
 
 > Portfolio exercise, not a medical device.
 
