@@ -43,7 +43,8 @@ Tune
     Execute Command           ${RADIO} WriteDoubleWord 0x508 ${offset}
 
 Send A Frame
-    ${bytes}=                 Evaluate    "[" + ", ".join(hex(b) for b in bytes.fromhex($FRAME)) + "]"
+    [Arguments]               ${frame}=${FRAME}
+    ${bytes}=                 Evaluate    "[" + ", ".join(hex(b) for b in bytes.fromhex($frame)) + "]"
     Execute Command           mach set "sender"
     Execute Command           sysbus WriteBytes ${bytes} ${PACKET}
     Execute Command           ${RADIO} WriteDoubleWord 0x000 1
@@ -62,6 +63,33 @@ Received
     ${hex}=                   Evaluate    bytes(int(b, 16) for b in re.findall("0x[0-9A-F]+", $bytes)).hex()
     ...                       modules=re
     RETURN                    ${hex}
+
+Register
+    [Arguments]               ${offset}
+    Execute Command           mach set "receiver"
+    ${value}=                 Execute Command    ${RADIO} ReadDoubleWord ${offset}
+    RETURN                    ${{int($value, 16)}}
+
+Matches The Device Address
+    [Arguments]               ${frame}    ${configuration}    ${entry}
+    # The address in entry 2, as Zephyr's controller fills DAB and DAP from its accept list:
+    # C0:00:AA:BB:CC:DD.
+    Create Two Radios
+    Execute Command           mach set "receiver"
+    Execute Command           ${RADIO} WriteDoubleWord 0x608 0xAABBCCDD
+    Execute Command           ${RADIO} WriteDoubleWord 0x628 0xC000
+    Execute Command           ${RADIO} WriteDoubleWord 0x640 ${configuration}
+    Listen
+    Send A Frame              ${frame}
+    Wait                      0.001
+    ${matched}=               Register    0x114
+    IF    $entry == "none"
+        Should Be Equal As Integers    ${matched}    0
+    ELSE
+        Should Be Equal As Integers    ${matched}    1
+        ${index}=                 Register    0x410
+        Should Be Equal As Integers    ${index}    ${entry}
+    END
 
 Loses A Frame It Missed
     [Arguments]               ${listen_after}    ${channel}
@@ -93,3 +121,16 @@ Hears A Frame That Arrives As It Turns Around
     Wait                      0.001
     ${received}=              Received
     Should Be Equal           ${received}    ${FRAME}
+
+Matches A Frame's Device Address
+    [Template]                Matches The Device Address
+    # A connection request: TxAdd (bit 6 of the header) says the address that opens the payload is
+    # random. DACNF enables entry 2 (bit 2) and gives its type as random (bit 10).
+    4506ddccbbaa00c0          0x0404    2
+    # The low four bytes compare with DAB, the top two with DAP.
+    4506ddccbbab00c0          0x0404    none
+    4506ddccbbaa00c1          0x0404    none
+    # The same address, but public.
+    0506ddccbbaa00c0          0x0404    none
+    # The entry holds the address but isn't enabled.
+    4506ddccbbaa00c0          0x0400    none

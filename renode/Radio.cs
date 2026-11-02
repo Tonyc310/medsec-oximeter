@@ -5,9 +5,11 @@
 // Full license text is available in LICENSE-renode, next to this file.
 //
 // Renode 1.17's NRF52840_Radio (renode-infrastructure 066a7f13,
-// src/Emulator/Peripherals/Peripherals/Wireless/NRF52840_Radio.cs), renamed, with one change: a
+// src/Emulator/Peripherals/Peripherals/Wireless/NRF52840_Radio.cs), renamed, with two changes: a
 // frame that reaches the radio while it isn't listening waits only for the exchange it belongs to,
-// as a real radio would never hear it later or on another channel (see Start).
+// as a real radio would never hear it later or on another channel (see Start); and the device
+// address match, which Zephyr's controller needs to take a connection only from its accept list
+// (see MatchDeviceAddress).
 //
 using System;
 using System.Collections.Concurrent;
@@ -66,9 +68,33 @@ namespace Antmicro.Renode.Peripherals.Wireless
             sysbus.WriteBytes(frame, address: dataAddress, startingIndex: addressLength, count: headerLengthInRAM);
             var payloadLength = Math.Min(frame[addressLength + (int)s0Length.Value], (byte)maxPacketLength.Value);
             sysbus.WriteBytes(frame, address: (ulong)(dataAddress + headerLengthInRAM), startingIndex: addressLength + headerLengthInAir, count: payloadLength);
+            MatchDeviceAddress(frame, addressLength, addressLength + headerLengthInAir);
 
             var crcLen = 4;
             ScheduleRadioEvents((uint)(headerLengthInAir + payloadLength + crcLen));
+        }
+
+        // As the chip does for Bluetooth LE: the first 48 bits of the payload are a device address,
+        // and bit 6 of S0 (TxAdd) its type; each entry DACNF enables is compared with both.
+        private void MatchDeviceAddress(byte[] frame, int s0Index, int payloadStart)
+        {
+            if(frame.Length < payloadStart + 6)
+            {
+                return;
+            }
+            var random = (frame[s0Index] & 0x40) != 0;
+            var addressBase = BitConverter.ToUInt32(frame, payloadStart);
+            var addressPrefix = BitConverter.ToUInt16(frame, payloadStart + 4);
+            for(var i = 0; i < DeviceAddresses; i++)
+            {
+                if(deviceAddressEnabled[i].Value && deviceAddressRandom[i].Value == random
+                   && deviceAddressBase[i].Value == addressBase && deviceAddressPrefix[i].Value == addressPrefix)
+                {
+                    matchedAddress = i;
+                    SetEvent(Events.DeviceAddressMatch);
+                    return;
+                }
+            }
         }
 
         public int Channel
@@ -297,6 +323,30 @@ namespace Antmicro.Renode.Peripherals.Wireless
                 .WithTag("CCAEDTHRES", 8, 8)
                 .WithTag("CCACORRTHRES", 16, 8)
                 .WithTag("CCACORRCNT", 24, 8)
+            ;
+
+            DefineEvent(Registers.DeviceMatch, () => this.Log(LogLevel.Error, "Trying to trigger DEVMATCH event, not supported"), Events.DeviceAddressMatch, "EVENTS_DEVMATCH");
+
+            Registers.DeviceAddressMatchIndex.Define(this, name: "DAI")
+                .WithValueField(0, 3, FieldMode.Read, valueProviderCallback: _ => (ulong)matchedAddress, name: "DAI")
+                .WithReservedBits(3, 29)
+            ;
+
+            for(var i = 0; i < DeviceAddresses; i++)
+            {
+                ((Registers)((long)Registers.DeviceAddressBaseSegment0 + 4 * i)).Define(this, name: $"DAB[{i}]")
+                    .WithValueField(0, 32, out deviceAddressBase[i], name: "DAB")
+                ;
+                ((Registers)((long)Registers.DeviceAddressPrefix0 + 4 * i)).Define(this, name: $"DAP[{i}]")
+                    .WithValueField(0, 16, out deviceAddressPrefix[i], name: "DAP")
+                    .WithReservedBits(16, 16)
+                ;
+            }
+
+            Registers.DeviceAddressMatchConfiguration.Define(this, name: "DACNF")
+                .WithFlags(0, DeviceAddresses, out deviceAddressEnabled, name: "ENA")
+                .WithFlags(8, DeviceAddresses, out deviceAddressRandom, name: "TXADD")
+                .WithReservedBits(16, 16)
             ;
 
             Registers.PowerControl.Define(this, 1, name: "POWER")
@@ -546,6 +596,11 @@ namespace Antmicro.Renode.Peripherals.Wireless
 
         private State radioState;
         private byte[] addressPrefixes;
+        private readonly IValueRegisterField[] deviceAddressBase = new IValueRegisterField[DeviceAddresses];
+        private readonly IValueRegisterField[] deviceAddressPrefix = new IValueRegisterField[DeviceAddresses];
+        private IFlagRegisterField[] deviceAddressEnabled;
+        private IFlagRegisterField[] deviceAddressRandom;
+        private int matchedAddress;
         private Shorts shorts;
         private IFlagRegisterField crcIncludedInLength;
         private IValueRegisterField staticLength;
@@ -646,6 +701,7 @@ namespace Antmicro.Renode.Peripherals.Wireless
         };
 
         private const int DefaultRSSISample = 10;
+        private const int DeviceAddresses = 8;
 
         private struct Shorts
         {
