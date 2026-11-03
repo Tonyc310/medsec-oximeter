@@ -1,0 +1,10 @@
+# Each case reaches Zephyr as an interrupt, as in Zephyr's fuzzing sample.
+config ARCH_POSIX_FUZZ_IRQ
+	int "Interrupt that delivers each fuzz case"
+	default 31
+
+config ARCH_POSIX_FUZZ_TICKS
+	int "Ticks of simulated time each fuzz case gets"
+	default 2
+
+source "Kconfig.zephyr"

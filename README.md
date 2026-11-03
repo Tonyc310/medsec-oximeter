@@ -16,7 +16,7 @@ Phase 4, the security controls, is done but for the debug-port lock, which needs
 
 Phase 5, the SBOM and the vulnerability assessment, is done. Every build makes an SBOM of what it compiled ([docs/security/sbom.md](docs/security/sbom.md)), and every known vulnerability in its components has a written assessment of whether it affects the oximeter ([docs/security/vulnerabilities.md](docs/security/vulnerabilities.md)). A weekly check asks NVD for new CVEs and fails until each has one.
 
-Phase 6, security testing, is done but for what needs the board: the debug-port lock and penetration testing by someone independent of the design. Fuzzing covers what other devices send, including the update protocol as a hostile gateway would send it; boot tests try forged, altered and older firmware; a check finds no key built into the firmware; and a table, checked on every push, traces each threat to its controls and their tests. [docs/security/test-report.md](docs/security/test-report.md) gives the result, the defects testing found, and what's open.
+Phase 6, security testing, is done but for what needs the board: the debug-port lock and penetration testing by someone independent of the design. Fuzzing covers what other devices send, including the update protocol as a hostile gateway would send it, and Zephyr's Bluetooth host as a central that never pairs reaches it; boot tests try forged, altered and older firmware; a check finds no key built into the firmware; and a table, checked on every push, traces each threat to its controls and their tests. [docs/security/test-report.md](docs/security/test-report.md) gives the result, the defects testing found, and what's open.
 
 Phase 7, the postmarket management plan and labeling, is under way. The [management plan](docs/security/management-plan.md) says how vulnerabilities found after release are watched for, assessed, fixed within FDA's timelines and disclosed, and [SECURITY.md](SECURITY.md) how to report one. The [security labeling](docs/security/labeling.md) tells patients, ward staff and the hospital's technical staff what they need to keep the device secure, down to how to erase it for good.
 
@@ -157,6 +157,15 @@ UBSAN_OPTIONS=halt_on_error=1:suppressions=fuzz/smp/ubsan.supp build/smp_fuzz/ze
     build/smp_fuzz/corpus build/smp_fuzz/seeds -dict=fuzz/smp/smp.dict -max_total_time=60
 ```
 
+Zephyr's Bluetooth host is fuzzed the same way, as a central that never pairs reaches it ([fuzz/bt_host](fuzz/bt_host)). A controller the fuzzer plays ([fuzz/bt_host/src/hci_fuzz.c](fuzz/bt_host/src/hci_fuzz.c)) brings the host up with the oximeter's Bluetooth settings, connects a central for each case, and gives the host libFuzzer's bytes as L2CAP frames on ATT, LE signalling and SMP. The first cases are each command a central can send on those channels. AddressSanitizer and UBSan stop at anything they find, and so does a case the host doesn't finish taking. CI runs it for a minute; it needs clang:
+
+```bash
+ZEPHYR_TOOLCHAIN_VARIANT=host/llvm west build -b native_sim/native/64 -d build/bt_fuzz fuzz/bt_host
+python3 fuzz/bt_host/first_cases.py build/bt_fuzz/seeds && mkdir -p build/bt_fuzz/corpus
+UBSAN_OPTIONS=halt_on_error=1 build/bt_fuzz/zephyr/zephyr.exe build/bt_fuzz/corpus \
+    build/bt_fuzz/seeds -max_total_time=60 -timeout=10
+```
+
 The Python tools follow PEP 8 and PEP 257, checked by ruff, and mypy checks their types strictly ([pyproject.toml](pyproject.toml)). The SBOM tool's tests check that it lists every component built into either image with its version and identifiers, and that it refuses one the curated list doesn't name. The Bluetooth feature check's tests check that it passes the features the oximeter uses, and names one that must be off and is on, one that must be on and is off, and a link-layer feature that's on but not on its list. The vulnerability check's tests, with a stand-in for NVD, check that it passes when every CVE found has a disposition and names one that doesn't. The key check's tests check that it passes an image holding no key and names each key planted in one. The traceability tool's tests check that it builds a row for each threat, names each break in the chain from threat to control to test, and names a table that's out of date. The tool itself checks that every test the [controls](docs/security/controls.md) name exists, and that [docs/security/traceability.md](docs/security/traceability.md) is up to date; without `--check`, it rewrites the table. The CVSS tool's tests check its scores against FIRST's worked examples, its exploitability levels and acceptance criteria at their edges, each branch of the rubric's decision flows, that it refuses a malformed vector or malformed answers, that it names a row whose vector its answers don't give, and that it fills in each row of the [risk assessment](docs/security/risk-assessment.md) and names one that's out of date or can't be scored; `--check` checks the committed rows, and without it the tool fills them in:
 
 ```bash
@@ -223,7 +232,7 @@ hub/            the stand-in gateway's Zephyr application, and tests for its sig
 common/         what the two applications share: Bluetooth and crypto definitions, crypto settings
 core/           the oximetry analysis, the PLX encoding, the alarm checks and signed limit changes: portable C17, no Zephyr
 tests/          Unity tests for core/, run on the host
-fuzz/           libFuzzer targets for core/'s parsers, and in smp/ for the update protocol on native_sim
+fuzz/           libFuzzer targets for core/'s parsers; in smp/ for the update protocol and in bt_host/ for Zephyr's Bluetooth host, both on native_sim
 tools/          provision.py, the factory's step that puts an oximeter's keys into UICR; sbom.py, the SBOM of a build; vulns.py, the vulnerability check; find_keys.py, the check that no key is built in; bt_features.py, the check that only the Bluetooth features the oximeter uses are on; traceability.py, the table from threat to test; cvss.py, the risk assessment's scores; tests/
 renode/         Renode platform, scripts, the MAX30101, flash controller, CCM, address resolver and radio models, and the Robot tests
 docs/security/  the cybersecurity documentation for a premarket submission

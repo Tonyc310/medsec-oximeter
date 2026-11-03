@@ -102,7 +102,7 @@ Every oximeter runs the same Bluetooth stack, and anything in range reaches it b
 
 **Built.** An unpaired device can read only the device ID and the sealed pairing data (C-04), and reaches only the Bluetooth features the oximeter uses (C-26); the parsers of what other devices send are fuzzed (C-10); a change an exploit makes to the firmware doesn't survive a restart, since a modified image won't boot (C-08); the watchdog restarts a hung oximeter within 2 s (C-18); the gateway notices a silent oximeter within half a second (C-19); and every week CI checks every component for known vulnerabilities (C-22), whose fixes ship as signed updates (C-20). Tests: "Refuses A Phone That Isn't Paired", the fuzz targets, "Recovers From A Hang Through The Watchdog", "Notices A Silent Oximeter Within Two Seconds".
 
-**To do.** Fuzz the Bluetooth protocols Zephyr handles before pairing (T-16, T-36). No control rules out a flaw in third-party code; the [risk assessment](risk-assessment.md#risk-thats-left) gives the reasons this can't be designed out.
+**To do.** Fuzz the link layer, which Zephyr's controller handles before anything reaches the host (T-16, T-36). No control rules out a flaw in third-party code; the [risk assessment](risk-assessment.md#risk-thats-left) gives the reasons this can't be designed out.
 
 ## Monitoring stopping together
 

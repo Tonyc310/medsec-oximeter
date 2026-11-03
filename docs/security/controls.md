@@ -127,11 +127,11 @@ Tests are named as their suites name them: Robot tests in [renode/oximeter.robot
 
 **Requirement.** Every parser of bytes from another device refuses anything malformed, without reading or writing out of bounds, and leaves the state as it was.
 
-**Built.** The decoders in `core/` check length, flags and range before taking anything: limits ([core/src/alarm.c](../../core/src/alarm.c)), limit commands ([core/src/limits_auth.c](../../core/src/limits_auth.c)), readings at the hub ([core/src/plx.c](../../core/src/plx.c)) and log records ([core/src/security_log.c](../../core/src/security_log.c)). Requests over SMP go to Zephyr's MCUmgr.
+**Built.** The decoders in `core/` check length, flags and range before taking anything: limits ([core/src/alarm.c](../../core/src/alarm.c)), limit commands ([core/src/limits_auth.c](../../core/src/limits_auth.c)), readings at the hub ([core/src/plx.c](../../core/src/plx.c)) and log records ([core/src/security_log.c](../../core/src/security_log.c)). Requests over SMP go to Zephyr's MCUmgr, and everything else a central sends to Zephyr's Bluetooth host.
 
-**Verified by.** The unit tests' refusals, such as `test_rejects_limits_of_the_wrong_length`, `test_keeps_the_limits_in_force_when_it_rejects_new_ones`, `test_rejects_a_length_that_does_not_match_its_flags`, `test_rejects_reserved_flags`, `test_keeps_the_last_reading_when_it_rejects_a_measurement`, `test_ignores_malformed_records_found_in_flash`; the fuzz targets `fuzz_limits_command`, `fuzz_plx_decode` and `fuzz_security_log`, and the update-protocol fuzzer ([fuzz/smp](../../fuzz/smp)), each under AddressSanitizer and UndefinedBehaviorSanitizer.
+**Verified by.** The unit tests' refusals, such as `test_rejects_limits_of_the_wrong_length`, `test_keeps_the_limits_in_force_when_it_rejects_new_ones`, `test_rejects_a_length_that_does_not_match_its_flags`, `test_rejects_reserved_flags`, `test_keeps_the_last_reading_when_it_rejects_a_measurement`, `test_ignores_malformed_records_found_in_flash`; the fuzz targets `fuzz_limits_command`, `fuzz_plx_decode` and `fuzz_security_log`, the update-protocol fuzzer ([fuzz/smp](../../fuzz/smp)), and the Bluetooth host fuzzer ([fuzz/bt_host](../../fuzz/bt_host)), which gives Zephyr's host any frame a central could send before pairing; each under AddressSanitizer and UndefinedBehaviorSanitizer.
 
-**Limits.** Zephyr's Bluetooth stack below the characteristics is not fuzzed here (T-16).
+**Limits.** The link layer, which Zephyr's controller handles before anything reaches the host, isn't fuzzed: that needs the radio (T-16).
 
 ### C-26 Only the Bluetooth features it uses
 
@@ -141,7 +141,7 @@ Tests are named as their suites name them: Robot tests in [renode/oximeter.robot
 
 **Verified by.** The four tests of [tools/tests/test_bt_features.py](../../tools/tests/test_bt_features.py), and the check itself on every build; every end-to-end test shows the gateway needs nothing that was turned off.
 
-**Limits.** What the oximeter uses is still reached before pairing: the link layer, L2CAP signalling, ATT and SMP (T-16).
+**Limits.** What the oximeter uses is still reached before pairing: the link layer, L2CAP signalling, ATT and SMP. Zephyr's host is fuzzed with them (C-10); the link layer isn't yet (T-16).
 
 ### C-11 Debug port locked
 

@@ -1,0 +1,11 @@
+description: A Bluetooth controller the fuzzer plays, in place of the radio
+
+compatible: "vnd,bt-hci-fuzz"
+
+include: bt-hci.yaml
+
+properties:
+  bt-hci-name:
+    default: "fuzz"
+  bt-hci-bus:
+    default: "virtual"

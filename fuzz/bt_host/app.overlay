@@ -1,0 +1,13 @@
+/ {
+	chosen {
+		zephyr,bt-hci = &fuzz_hci;
+	};
+
+	fuzz_hci: fuzz_hci {
+		compatible = "vnd,bt-hci-fuzz";
+	};
+};
+
+&bt_hci_userchan {
+	status = "disabled";
+};

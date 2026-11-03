@@ -15,7 +15,7 @@ Every test passed in CI [run 61](https://github.com/Tonyc310/medsec-oximeter/act
 | Simulation models | `flash.robot`, `ccm.robot`, `radio.robot`, `sensor.robot` in [renode/](../../renode/) | 15 | the models this project adds to Renode or fixes, against their specifications or Zephyr's own driver tests |
 | Unit, host | [tests/](../../tests/) | 59 | `core/` under AddressSanitizer and UndefinedBehaviorSanitizer |
 | Unit, `native_sim` | `tests/` in [app/](../../app/tests/), [hub/](../../hub/tests/), [common/](../../common/tests/) | 28 | code that needs Zephyr, run as a program on the PC |
-| Fuzzing | [fuzz/](../../fuzz/) | 4 targets | libFuzzer, a minute each, under the same sanitizers |
+| Fuzzing | [fuzz/](../../fuzz/) | 5 targets | libFuzzer, a minute each, under the same sanitizers |
 | Tools | [tools/tests/](../../tools/tests/) | 100 | pytest |
 
 ## Environment
@@ -54,7 +54,7 @@ No test covers the threats without a control (T-19, T-23 to T-31, T-35), nor T-0
 
 ## Vulnerability testing
 
-**Malformed and unexpected input.** libFuzzer gives any bytes at all to the parsers of what other devices send, and checks a property on every input: three targets on `core/`, for limit changes, readings and log records, and one on the update protocol as a hostile paired gateway would send it, where the running image's slot must never change ([fuzz/smp](../../fuzz/smp)). Fuzzing found undefined behavior at two places in Zephyr's MCUmgr, neither of which a gateway can steer; the [vulnerability assessment](vulnerabilities.md#found-by-fuzzing) explains both.
+**Malformed and unexpected input.** libFuzzer gives any bytes at all to the parsers of what other devices send, and checks a property on every input: three targets on `core/`, for limit changes, readings and log records, and one on the update protocol as a hostile paired gateway would send it, where the running image's slot must never change ([fuzz/smp](../../fuzz/smp)), and one on Zephyr's Bluetooth host as a central that never pairs reaches it, any frame on ATT, LE signalling or SMP, through a controller the fuzzer plays ([fuzz/bt_host](../../fuzz/bt_host)). Fuzzing found undefined behavior at two places in Zephyr's MCUmgr, neither of which a gateway can steer; the [vulnerability assessment](vulnerabilities.md#found-by-fuzzing) explains both.
 
 **Abuse cases.** The attackers under [Threat mitigation](#threat-mitigation).
 
