@@ -31,6 +31,7 @@ The controls built against the [threat model](threat-model.md), grouped the way 
 | C-21 | No rollback to an older release | updates | T-34 | built |
 | C-22 | SBOM and vulnerability monitoring | updates | T-36 | built |
 | C-23 | A connection kept for the gateway | resilience | T-11 | built |
+| C-24 | No health data on the console | confidentiality | T-20 | built |
 
 Tests are named as their suites name them: Robot tests in [renode/oximeter.robot](../../renode/oximeter.robot) and [renode/boot.robot](../../renode/boot.robot), unit tests of `core/` in [tests/](../../tests/), Zephyr tests on `native_sim` in each application's `tests/`, and the fuzz targets in [fuzz/](../../fuzz/).
 
@@ -150,6 +151,16 @@ Readings, limits and the log travel only over the encrypted link of C-01 and C-0
 
 **Verified by.** "Goes Back To The Default Limits For A New Patient", "Ignores A Short Press", "Pairs Again Once The Backend Allows It", "Logs The Reset For A New Patient"; `test_forgets_the_limits_when_cleared` (app/tests/limits_store).
 
+### C-24 No health data on the console
+
+**Requirement.** The console, which anyone holding the oximeter can read with a serial adapter, carries no readings, alarms or alarm limits.
+
+**Built.** The firmware logs only what a technician servicing the device needs: the version it starts, Bluetooth and pairing events, that the limits changed but not to what, and errors. Readings and alarms leave the oximeter only over the encrypted link (C-01, C-04), and its own LED.
+
+**Verified by.** "Keeps Health Data Off Its Console".
+
+**Limits.** The console stays open, output only: it shows the firmware version, which tells an attacker which known vulnerabilities apply, and when the oximeter pairs or its limits change.
+
 ## Event detection and logging
 
 ### C-13 Security event log
@@ -263,7 +274,6 @@ Readings, limits and the log travel only over the encrypted link of C-01 and C-0
 | T-13 Tracking by address and name | The oximeter keeps a fixed address and names itself in its scan response; Bluetooth privacy (resolvable private addresses) is off |
 | T-14, T-15 Firmware written or read through the debug port | C-08 stops altered firmware running, but the debug port stays open until C-11 |
 | T-19 A replaced sensor or injected signals | The firmware checks only the sensor's part number |
-| T-20 Health data on the console | The console logs readings and limit changes in plain text |
 | T-22 A compromised gateway alters readings | C-03, C-05, C-14 and C-15 stop it forging limits, keeping updates and editing the log, but readings aren't signed end to end |
 | T-23 to T-31 The gateway's and backend's own threats | The Raspberry Pi gateway and the backend aren't built yet |
 | T-35 A stolen release key | One key per checkout, never committed; the offline signing service is planned, and a key MCUboot trusts can't be replaced in the field |

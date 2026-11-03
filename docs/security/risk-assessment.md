@@ -356,7 +356,7 @@ Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:
 | T-17 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:C/C:N/I:N/A:H` | 7.4 | 2.8 High | Catastrophic | **uncontrolled** |
 | T-18 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N` | 2.4 | 0.9 Low | None | controlled |
 | T-19 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:C/C:N/I:H/A:H` | 7.3 | 0.9 Low | Catastrophic | controlled |
-| T-20 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N` | 4.6 | 0.9 Low | None | controlled |
+| T-20 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N` | 2.4 | 0.9 Low | None | controlled |
 
 **T-14**, No control yet: C-08 checks the firmware at every boot, but through the debug port MCUboot itself can be replaced. As before.
 
@@ -382,9 +382,9 @@ Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPR
 
 Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
 
-**T-20**, No control yet. As before.
+**T-20**, C-24 keeps readings, alarms and limits off the console. *Confidentiality*: what's left is the firmware version and the device's events without their values. The version tells an attacker which known vulnerabilities apply; nothing tells them about the patient.
 
-Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:N/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:N/XIL:N/XAH:N/XAL:N`
+Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:N/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:L/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:Y/XIH:N/XIL:N/XAH:N/XAL:N`
 
 ### The bedside gateway
 

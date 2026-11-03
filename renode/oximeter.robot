@@ -147,6 +147,16 @@ A Stranger Holds A Connection
     Wait For Line On Uart     Connected:    testerId=${phone}    timeout=10
     RETURN                    ${phone}
 
+Hub Reading Time
+    [Arguments]               ${pause}=false
+    # When the hub heard the reading, from its log's timestamp: its log lines can trail by a second.
+    ${line}=                  Wait For Line On Uart    hub: SpO2    testerId=${hub}    timeout=10
+    ...                       pauseEmulation=${pause}
+    ${time}=                  Evaluate
+    ...                       re.search(r"[[]([0-9]+):([0-9]+):([0-9]+)[.]([0-9]+),([0-9]+)[]] .*hub: SpO2", str($line))
+    ...                       modules=re
+    RETURN                    ${{3600 * int($time[1]) + 60 * int($time[2]) + int($time[3]) + int($time[4]) / 1e3 + int($time[5]) / 1e6}}
+
 Value Handle Of
     [Arguments]               ${uuid}
     # The shell reads 16-bit UUIDs only, so a 128-bit characteristic is used by its value's handle,
@@ -261,7 +271,9 @@ Goes Back To The Default Limits For A New Patient
     Wait For Line On Uart     oximeter accepted the alarm limits    testerId=${hub}
     # The last patient's limits are no one else's: the next starts with the defaults.
     Reset The Oximeter For A New Patient
-    Wait For Line On Uart     alarm limits: SpO2 below 90%, pulse below 50 or above 120 bpm    testerId=${oximeter}
+    # At 94% the last patient's 95% limit would light the alarm at the first reading, 4 s after the
+    # start, as would a sensor that stopped: a dark LED shows the defaults are back, and readings on.
+    Assert And Hold Led State    false    2    8
 
 Ignores A Short Press
     Start System
@@ -428,9 +440,8 @@ Keeps The Clinician's Limits Through A Reset
     ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
     Execute Command           mach set "oximeter"
     Execute Command           machine Reset
-    Wait For Line On Uart     alarm limits: SpO2 below 95%    testerId=${oximeter}
-    Wait For Line On Uart     ALARM: SpO2 low    testerId=${oximeter}    timeout=10
-    Assert LED State          true
+    Assert LED State          false    timeout=2
+    Assert LED State          true    timeout=8
 
 Reads Every Sample Waiting In The Sensor
     Start System
@@ -450,18 +461,24 @@ Starts A New Reading After The Sensor Loses Samples
     Start System
     Monitor A Patient At 94 Percent
     ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
+    # Paused at a reading the hub logged; those it heard and hasn't logged yet come next.
+    ${previous}=              Hub Reading Time    pause=true
     # 400 ms without an interrupt, longer than the sensor's FIFO lasts (320 ms): it loses samples,
     # and a reading across the gap would be skewed.
-    Execute Command           pause
     Execute Command           ${SENSOR} InterruptCut true
     Execute Command           emulation RunFor "0.4"
     Execute Command           ${SENSOR} InterruptCut false
     Start Emulation
     Wait For Line On Uart     the sensor lost samples; starting a new reading    testerId=${oximeter}    timeout=2
-    # The next reading waits for four seconds of samples after the gap; log lines can trail by up
-    # to a second.
-    Should Not Be On Uart     SpO2    testerId=${oximeter}    timeout=2.5
-    Wait For Line On Uart     SpO2 94%    testerId=${oximeter}    timeout=3
+    # Readings come a second apart. The first after the gap waits for four seconds of samples; one
+    # across the gap would come 1.4 s after the last.
+    FOR    ${i}    IN RANGE    8
+        ${reading}=           Hub Reading Time
+        ${gap}=               Evaluate    ${reading} - ${previous}
+        IF    ${gap} > 1.2    BREAK
+        ${previous}=          Set Variable    ${reading}
+    END
+    Should Be True            ${gap} >= 4
 
 Raises The Technical Alarm When The Sensor Stops
     Start System
@@ -492,7 +509,8 @@ Recovers From A Hang Through The Watchdog
     Execute Command           mach set "oximeter"
     Execute Command           cpu IsHalted true
     Wait For Line On Uart     medsec-oximeter 1.0.0+0 started    testerId=${oximeter}    timeout=5
-    Wait For Line On Uart     SpO2 94%, pulse (89|90|91) bpm    testerId=${oximeter}    treatAsRegex=true    timeout=10
+    Wait For Line On Uart     connected to a pulse oximeter    testerId=${hub}    timeout=10
+    Wait For Line On Uart     hub: SpO2 94%, pulse (89|90|91) bpm    testerId=${hub}    treatAsRegex=true    timeout=10
 
 Logs The Security Events The Hub Reads
     Start System
@@ -587,3 +605,14 @@ Shows Whether The Hub Read The Whole Log
     [Template]                The Log Check Should Show
     0                         the oximeter's log is complete up to record #
     1                         the oximeter has 1 record the hub hasn't read
+
+Keeps Health Data Off Its Console
+    Start System
+    ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
+    Monitor A Patient At 94 Percent
+    # A signed change the patient then alarms on: neither the limits, nor the alarm, nor its cause
+    # may reach the console, which anyone holding the oximeter can read (threat T-20).
+    Write Line To Uart        limits 95 50 120    testerId=${hub}
+    Wait For Line On Uart     ALARM from oximeter: SpO2 low    testerId=${hub}
+    Should Not Be On Uart     SpO2|bpm|ALARM|no pulse    testerId=${oximeter}    treatAsRegex=true
+    ...                       timeout=2

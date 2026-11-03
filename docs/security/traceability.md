@@ -29,7 +29,7 @@ test named exists and that this table is up to date.
 | T-17 A crash or hang stops measurement and alarms | [C-17](controls.md#c-17-technical-alarm-when-the-sensor-stops), [C-18](controls.md#c-18-watchdog) | 2 Renode, 5 unit |
 | T-18 The oximeter records no security events: connections, limit changes, rejected writes | [C-13](controls.md#c-13-security-event-log), [C-14](controls.md#c-14-log-records-tagged-by-the-oximeter) | 8 Renode, 15 unit |
 | T-19 The sensor is replaced, or false signals are injected on its bus | [gap](controls.md#threats-without-a-control-yet) | none |
-| T-20 The console port logs readings and limit changes in plain text | [gap](controls.md#threats-without-a-control-yet) | none |
+| T-20 The console port logs readings and limit changes in plain text | [C-24](controls.md#c-24-no-health-data-on-the-console) | 1 Renode |
 | T-21 Someone at the gateway changes alarm limits through its local interfaces | [C-03](controls.md#c-03-signed-alarm-limit-changes) | 2 Renode, 12 unit, 1 fuzz |
 | T-22 A compromised gateway alters, drops or invents what it relays, in both directions | [C-03](controls.md#c-03-signed-alarm-limit-changes), [C-05](controls.md#c-05-only-the-oximeters-self-test-keeps-an-update), [C-14](controls.md#c-14-log-records-tagged-by-the-oximeter), [C-15](controls.md#c-15-proof-the-log-read-is-complete), [gap](controls.md#threats-without-a-control-yet) | 6 Renode, 20 unit, 2 fuzz |
 | T-23 The gateway goes offline: power, network, crash | [gap](controls.md#threats-without-a-control-yet) | none |

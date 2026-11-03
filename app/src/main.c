@@ -79,11 +79,8 @@ static void take_sample(const struct device *dev)
         return;
     }
     confirm_image();
-    if (reading.valid) {
-        LOG_INF("SpO2 %u%%, pulse %u bpm", reading.spo2_percent, reading.pulse_bpm);
-    } else {
-        LOG_INF("no pulse found");
-    }
+    /* Readings leave only over the encrypted link and as the LED's alarm, never on the console,
+     * which anyone holding the oximeter can read (threat T-20). */
     plx_service_send(&reading);
     alarm_service_update(&reading);
 }

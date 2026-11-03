@@ -90,8 +90,7 @@ static ssize_t write_limits(struct bt_conn *conn, const struct bt_gatt_attr *att
 
     limits = requested;
     k_spin_unlock(&lock, key);
-    LOG_INF("alarm limits set: SpO2 below %u%%, pulse below %u or above %u bpm",
-            requested.spo2_low_percent, requested.pulse_low_bpm, requested.pulse_high_bpm);
+    LOG_INF("alarm limits changed");
     (void)event_log_record(SECURITY_EVENT_LIMITS_ACCEPTED, encoded, sizeof encoded);
     return (ssize_t)len;
 }
@@ -213,25 +212,6 @@ BT_CONN_CB_DEFINE(alarm_connection_callbacks) = {
 /* attrs[3] is the alarm state characteristic: after the service and the limits' two attributes. */
 #define ALARM_STATE (&alarm_service.attrs[3])
 
-static void log_alarms(uint8_t alarms)
-{
-    if (alarms == 0u) {
-        LOG_INF("alarms cleared");
-    }
-    if ((alarms & ALARM_SPO2_LOW) != 0u) {
-        LOG_WRN("ALARM: SpO2 low");
-    }
-    if ((alarms & ALARM_PULSE_LOW) != 0u) {
-        LOG_WRN("ALARM: pulse low");
-    }
-    if ((alarms & ALARM_PULSE_HIGH) != 0u) {
-        LOG_WRN("ALARM: pulse high");
-    }
-    if ((alarms & ALARM_NO_READING) != 0u) {
-        LOG_WRN("ALARM: no pulse found, check the sensor");
-    }
-}
-
 int alarm_service_init(void)
 {
     /* Monitoring matters more than the stored limits: if they can't be read, the defaults hold. */
@@ -240,8 +220,6 @@ int alarm_service_init(void)
     if (err != 0) {
         LOG_ERR("stored alarm limits unreadable (%d): using the defaults", err);
     }
-    LOG_INF("alarm limits: SpO2 below %u%%, pulse below %u or above %u bpm",
-            limits.spo2_low_percent, limits.pulse_low_bpm, limits.pulse_high_bpm);
     uint8_t key[DEVICE_KEY_SIZE];
     const bool provisioned = device_identity_key(DEVICE_KEY_LIMITS, key);
 
@@ -276,7 +254,6 @@ void alarm_service_update(const oximetry_reading_t *reading)
     (void)gpio_pin_set_dt(&led, (alarms != 0u) ? 1 : 0);
     if (alarms != state) {
         state = alarms;
-        log_alarms(alarms);
 
         const int err = bt_gatt_notify(NULL, ALARM_STATE, &state, sizeof state);
 

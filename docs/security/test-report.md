@@ -10,7 +10,7 @@ Every test passed in CI [run 61](https://github.com/Tonyc310/medsec-oximeter/act
 
 | Kind | Where | Tests | How |
 |---|---|---|---|
-| End to end | [renode/oximeter.robot](../../renode/oximeter.robot) | 36 | both boards in Renode, joined by a simulated Bluetooth link |
+| End to end | [renode/oximeter.robot](../../renode/oximeter.robot) | 37 | both boards in Renode, joined by a simulated Bluetooth link |
 | Secure boot | [renode/boot.robot](../../renode/boot.robot) | 5 | the oximeter booting through MCUboot in Renode |
 | Simulation models | `flash.robot`, `ccm.robot`, `radio.robot`, `sensor.robot` in [renode/](../../renode/) | 13 | the models this project adds to Renode or fixes, against their specifications or Zephyr's own driver tests |
 | Unit, host | [tests/](../../tests/) | 59 | `core/` under AddressSanitizer and UndefinedBehaviorSanitizer |
@@ -46,9 +46,10 @@ The end-to-end and boot tests play each attacker the simulation can:
 - **Forged, altered and old firmware** (T-33, T-34): an image signed with MCUboot's published key, one changed after signing, an unsigned update and one given a security counter outside its signature (CVE-2024-32883) never run, and an older release is erased ("Never Starts An Image The Release Key Didn't Sign", "Erases An Update With Anything The Release Key Didn't Sign", "Refuses An Older Release").
 - **Another gateway, and a device passed to a new patient** (T-12, T-37): "Lets A New Gateway's Pairing Replace The Old One", "Pairs Again Once The Backend Allows It".
 - **An oximeter the factory never provisioned**: "Can't Be Paired Without A Device Key".
+- **Someone with a serial adapter on the console** (T-20): through readings, a limits change and an alarm, the console shows none of them ("Keeps Health Data Off Its Console").
 - **A device that connects first and holds on** (T-11): a phone that connects and never pairs doesn't keep the hub out, a second can't connect beside it, none can connect while the hub is linked, and one that hasn't paired 30 s after connecting is dropped, while the hub isn't ("Lets Its Gateway Back While A Stranger Holds A Connection", "Turns Away A Second Stranger", "Takes No Other Central While Its Gateway Is Linked", "Drops A Central That Doesn't Pair In Time", "Keeps Its Gateway Linked Past The Pairing Timeout").
 
-No test covers the threats without a control (T-13, T-19, T-20, T-23 to T-31, T-35), nor T-08: C-01 addresses a fake oximeter, but no test plays one. Nor does any test play T-11's attacker with a second radio using the gateway's address.
+No test covers the threats without a control (T-13, T-19, T-23 to T-31, T-35), nor T-08: C-01 addresses a fake oximeter, but no test plays one. Nor does any test play T-11's attacker with a second radio using the gateway's address.
 
 ## Vulnerability testing
 
@@ -64,7 +65,7 @@ No test covers the threats without a control (T-13, T-19, T-20, T-23 to T-31, T-
 
 **Software composition.** The [SBOM](sbom.md) lists what each build compiled, and [tools/vulns.py](../../tools/vulns.py) checks it against NVD: each CVE found has a disposition in the [vulnerability assessment](vulnerabilities.md). That analyzes the source the build compiled, not the binaries. The assessment was made on 26 October 2026 with the check run locally; CI's weekly run of it starts on 2 November 2026.
 
-**Attack surface.** Of the oximeter's interfaces in the [system description](system.md), Bluetooth (I-2, I-3) and the update path over it (I-8) are tested end to end. The console (I-5) has no control yet (T-20), and attacks on the sensor bus (I-1) and the debug port (I-4) need hardware.
+**Attack surface.** Of the oximeter's interfaces in the [system description](system.md), Bluetooth (I-2, I-3) and the update path over it (I-8) are tested end to end. The console (I-5) is tested to carry no health data (C-24), and attacks on the sensor bus (I-1) and the debug port (I-4) need hardware.
 
 ## Penetration testing
 
