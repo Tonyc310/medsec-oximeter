@@ -180,6 +180,11 @@ jobs:
           --device-id 0123456789abcdef
           build/oximeter/app/zephyr/zephyr.signed.bin build/oximeter/mcuboot/zephyr/zephyr.bin
 
+      # A device that hasn't paired reaches every Bluetooth feature that's on: only those the
+      # oximeter uses may be.
+      - name: Check the Bluetooth features
+        run: python3 tools/bt_features.py build/oximeter/app/zephyr/.config
+
       # From what each image compiled (west spdx), with docs/security/components.yaml's versions,
       # identifiers and support: the SBOM of this exact build.
       - name: SBOM

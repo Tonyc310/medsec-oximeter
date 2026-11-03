@@ -33,6 +33,7 @@ The controls built against the [threat model](threat-model.md), grouped the way 
 | C-23 | A connection kept for the gateway | resilience | T-11 | built |
 | C-24 | No health data on the console | confidentiality | T-20 | built |
 | C-25 | A private address, and no name over the air | confidentiality | T-13 | built |
+| C-26 | Only the Bluetooth features it uses | integrity | T-16, T-36 | built |
 
 Tests are named as their suites name them: Robot tests in [renode/oximeter.robot](../../renode/oximeter.robot) and [renode/boot.robot](../../renode/boot.robot), unit tests of `core/` in [tests/](../../tests/), Zephyr tests on `native_sim` in each application's `tests/`, and the fuzz targets in [fuzz/](../../fuzz/).
 
@@ -131,6 +132,16 @@ Tests are named as their suites name them: Robot tests in [renode/oximeter.robot
 **Verified by.** The unit tests' refusals, such as `test_rejects_limits_of_the_wrong_length`, `test_keeps_the_limits_in_force_when_it_rejects_new_ones`, `test_rejects_a_length_that_does_not_match_its_flags`, `test_rejects_reserved_flags`, `test_keeps_the_last_reading_when_it_rejects_a_measurement`, `test_ignores_malformed_records_found_in_flash`; the fuzz targets `fuzz_limits_command`, `fuzz_plx_decode` and `fuzz_security_log`, and the update-protocol fuzzer ([fuzz/smp](../../fuzz/smp)), each under AddressSanitizer and UndefinedBehaviorSanitizer.
 
 **Limits.** Zephyr's Bluetooth stack below the characteristics is not fuzzed here (T-16).
+
+### C-26 Only the Bluetooth features it uses
+
+**Requirement.** No Bluetooth feature is on that the oximeter doesn't use, since a device that hasn't paired reaches every one that is.
+
+**Built.** The oximeter is a peripheral only, with no L2CAP dynamic channels, Enhanced ATT, signing or prepared writes. The link-layer procedures it doesn't need are off: connection parameter requests, LE Ping, the feature exchange a peripheral starts and channel-count requests; and so are GATT caching and both kinds of Read Multiple ([app/prj.conf](../../app/prj.conf)). [tools/bt_features.py](../../tools/bt_features.py) checks every build in CI: each feature on must be on its list, with the reason the oximeter needs it, and an optional link-layer feature that's on but not listed fails the check.
+
+**Verified by.** The four tests of [tools/tests/test_bt_features.py](../../tools/tests/test_bt_features.py), and the check itself on every build; every end-to-end test shows the gateway needs nothing that was turned off.
+
+**Limits.** What the oximeter uses is still reached before pairing: the link layer, L2CAP signalling, ATT and SMP (T-16).
 
 ### C-11 Debug port locked
 

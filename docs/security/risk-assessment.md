@@ -366,7 +366,7 @@ Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPR
 
 Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:H/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:N/XIL:N/XAH:N/XAL:N`
 
-**T-16**, C-10's parsers are fuzzed, and C-04 leaves an unpaired device only the device ID and the pairing data. But Zephyr's Bluetooth stack beneath them is reached before pairing, and a bug there scores as before: CVSS rates what a known bug allows, not how likely one is. C-08 keeps it from persisting, and C-22 and C-20 find and fix the known ones.
+**T-16**, C-10's parsers are fuzzed, C-04 leaves an unpaired device only the device ID and the pairing data, and C-26 turns off the Bluetooth features the oximeter doesn't use. But Zephyr's Bluetooth stack beneath them is reached before pairing, and a bug there scores as before: CVSS rates what a known bug allows, not how likely one is. C-08 keeps it from persisting, and C-22 and C-20 find and fix the known ones.
 
 Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
 
@@ -493,7 +493,7 @@ Each uncontrolled risk needs a control, or a reason it can't have one:
 |---|---|
 | T-10, a jammed link | It can't be prevented. The gateway and the backend need a technical alarm within 2 s of readings stopping, so the loss isn't silent; C-19 already notices it. With that alarm built, the severity is rated again. |
 | T-11, a held connection | C-23 makes keeping the gateway out a race the attacker must win every 30 s. What's left needs the alarm of T-10, so the loss isn't silent. |
-| T-16 and T-36, a flaw in the Bluetooth stack or another component | No control rules out a bug in third-party code, so this can't be designed out. Against it: fuzzing of the oximeter's own parsers (C-10), the weekly check for known vulnerabilities (C-22), signed updates to deliver a fix (C-20), and secure boot, so an exploit doesn't survive a restart (C-08). Still to do: fuzz the Bluetooth protocols Zephyr handles before pairing, and turn off those the oximeter doesn't use. |
+| T-16 and T-36, a flaw in the Bluetooth stack or another component | No control rules out a bug in third-party code, so this can't be designed out. Against it: fuzzing of the oximeter's own parsers (C-10), the weekly check for known vulnerabilities (C-22), signed updates to deliver a fix (C-20), and secure boot, so an exploit doesn't survive a restart (C-08). C-26 has turned off the Bluetooth features the oximeter doesn't use. Still to do: fuzz the protocols Zephyr handles before pairing. |
 | T-17, a crash an attacker repeats | As T-16, and the alarm of T-10, so the restarts are seen. |
 | T-22, a compromised gateway alters readings | Readings tagged by the oximeter, as its log records are (C-14), so the backend can tell an altered one; and the alarm of T-23 for those dropped. |
 | T-23 and T-31, the gateway or the backend down | A technical alarm at the backend when a gateway goes quiet, and at the gateway when the backend does; a backend run with redundancy. |

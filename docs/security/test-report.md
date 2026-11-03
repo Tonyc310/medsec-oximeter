@@ -16,7 +16,7 @@ Every test passed in CI [run 61](https://github.com/Tonyc310/medsec-oximeter/act
 | Unit, host | [tests/](../../tests/) | 59 | `core/` under AddressSanitizer and UndefinedBehaviorSanitizer |
 | Unit, `native_sim` | `tests/` in [app/](../../app/tests/), [hub/](../../hub/tests/), [common/](../../common/tests/) | 28 | code that needs Zephyr, run as a program on the PC |
 | Fuzzing | [fuzz/](../../fuzz/) | 4 targets | libFuzzer, a minute each, under the same sanitizers |
-| Tools | [tools/tests/](../../tools/tests/) | 96 | pytest |
+| Tools | [tools/tests/](../../tools/tests/) | 100 | pytest |
 
 ## Environment
 
@@ -66,7 +66,7 @@ No test covers the threats without a control (T-19, T-23 to T-31, T-35), nor T-0
 
 **Software composition.** The [SBOM](sbom.md) lists what each build compiled, and [tools/vulns.py](../../tools/vulns.py) checks it against NVD: each CVE found has a disposition in the [vulnerability assessment](vulnerabilities.md). That analyzes the source the build compiled, not the binaries. The assessment was made on 26 October 2026 with the check run locally; CI's weekly run of it starts on 2 November 2026.
 
-**Attack surface.** Of the oximeter's interfaces in the [system description](system.md), Bluetooth (I-2, I-3) and the update path over it (I-8) are tested end to end. The console (I-5) is tested to carry no health data (C-24), and attacks on the sensor bus (I-1) and the debug port (I-4) need hardware.
+**Attack surface.** Of the oximeter's interfaces in the [system description](system.md), Bluetooth (I-2, I-3) and the update path over it (I-8) are tested end to end, and only the Bluetooth features the oximeter uses are on, checked on every build (C-26). The console (I-5) is tested to carry no health data (C-24), and attacks on the sensor bus (I-1) and the debug port (I-4) need hardware.
 
 ## Penetration testing
 
