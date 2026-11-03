@@ -15,6 +15,12 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
     // Packets in RAM are a header byte, a length byte and a spare byte (S1), then the payload: the
     // radio's layout with S1 included, which Zephyr uses on the nRF52840. Only the 8-bit length
     // field is modeled, as Zephyr always selects it.
+    //
+    // The same peripheral is the address resolver (AAR), which a controller with privacy uses to
+    // recognize a bonded device's private address: ENABLE 3 selects it, and its registers sit where
+    // the CCM's are. TASKS_START is TASKS_KSGEN; END, RESOLVED and NOTRESOLVED are ENDKSGEN,
+    // ENDCRYPT and ERROR; NIRK shares MODE's register, IRKPTR CNFPTR's, ADDRPTR OUTPTR's, and STATUS
+    // MICSTATUS's.
     public class NRF52840_CCM : BasicDoubleWordPeripheral, IKnownSize
     {
         public NRF52840_CCM(IMachine machine) : base(machine)
@@ -42,13 +48,18 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
                     {
                         return;
                     }
+                    if(enable.Value == AddressResolverEnabled)
+                    {
+                        Resolve();
+                        return;
+                    }
                     keyStreamEnded.Value = true;
                     UpdateInterrupt();
                     if(cryptAfterKeyStream.Value)
                     {
                         Crypt();
                     }
-                }, name: "TASKS_KSGEN")
+                }, name: "TASKS_KSGEN, AAR TASKS_START")
                 .WithReservedBits(1, 31);
 
             Registers.Crypt.Define(this)
@@ -62,17 +73,17 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
                 .WithReservedBits(1, 31);
 
             Registers.KeyStreamEnded.Define(this)
-                .WithFlag(0, out keyStreamEnded, name: "EVENTS_ENDKSGEN")
+                .WithFlag(0, out keyStreamEnded, name: "EVENTS_ENDKSGEN, AAR EVENTS_END")
                 .WithReservedBits(1, 31)
                 .WithWriteCallback((_, __) => UpdateInterrupt());
 
             Registers.CryptEnded.Define(this)
-                .WithFlag(0, out cryptEnded, name: "EVENTS_ENDCRYPT")
+                .WithFlag(0, out cryptEnded, name: "EVENTS_ENDCRYPT, AAR EVENTS_RESOLVED")
                 .WithReservedBits(1, 31)
                 .WithWriteCallback((_, __) => UpdateInterrupt());
 
             Registers.Error.Define(this)
-                .WithFlag(0, out error, name: "EVENTS_ERROR")
+                .WithFlag(0, out error, name: "EVENTS_ERROR, AAR EVENTS_NOTRESOLVED")
                 .WithReservedBits(1, 31)
                 .WithWriteCallback((_, __) => UpdateInterrupt());
 
@@ -98,17 +109,20 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
                 .WithReservedBits(3, 29)
                 .WithWriteCallback((_, __) => UpdateInterrupt());
 
+            // The CCM's MIC check, 1 if it passed, or the index of the key the AAR resolved with.
             Registers.MicStatus.Define(this)
-                .WithFlag(0, out micValid, FieldMode.Read, name: "MICSTATUS")
-                .WithReservedBits(1, 31);
+                .WithValueField(0, 4, out status, FieldMode.Read, name: "MICSTATUS, AAR STATUS")
+                .WithReservedBits(4, 28);
 
             Registers.Enable.Define(this)
-                .WithValueField(0, 2, name: "ENABLE")
+                .WithValueField(0, 2, out enable, name: "ENABLE")
                 .WithReservedBits(2, 30);
 
+            // For the CCM, bit 0 is MODE, 1 to decrypt; for the AAR, the field is NIRK, the number
+            // of keys.
             Registers.Mode.Define(this, 0x1)
-                .WithFlag(0, out decrypt, name: "MODE")
-                .WithReservedBits(1, 15)
+                .WithValueField(0, 5, out modeOrKeyCount, name: "MODE, AAR NIRK")
+                .WithReservedBits(5, 11)
                 .WithValueField(16, 2, name: "DATARATE")
                 .WithReservedBits(18, 6)
                 .WithFlag(24, name: "LENGTH")
@@ -155,10 +169,10 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
             using(var ccm = new BluetoothCcm(key, Nonce(configuration)))
             {
                 byte[] result;
-                if(decrypt.Value)
+                if((modeOrKeyCount.Value & 1) != 0)
                 {
                     result = ccm.Decrypt(header[0], data, out var valid);
-                    micValid.Value = valid;
+                    status.Value = valid ? 1u : 0u;
                 }
                 else
                 {
@@ -168,6 +182,46 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
                 sysbus.WriteBytes(header, outputPointer.Value);
                 sysbus.WriteBytes(result, outputPointer.Value + HeaderSize);
             }
+        }
+
+        // Whether the address where a packet's payload starts, ADDRPTR + 3, is a private address one
+        // of the NIRK keys at IRKPTR resolves: its hash, the low 3 bytes, must be ah(key, prand) of
+        // the top 3 (Core specification Vol 3, Part H, 2.2.2). Keys are 16 bytes, most significant
+        // byte first; the address is least significant byte first, as a packet carries it.
+        private void Resolve()
+        {
+            var address = sysbus.ReadBytes(outputPointer.Value + AddressOffset, AddressSize);
+            for(var index = 0; index < (int)modeOrKeyCount.Value; index++)
+            {
+                var key = sysbus.ReadBytes(configurationPointer.Value + (ulong)(index * KeySize), KeySize);
+                if(Hash(key, address).SequenceEqual(address.Take(HashSize)))
+                {
+                    status.Value = (ulong)index;
+                    cryptEnded.Value = true;
+                    keyStreamEnded.Value = true;
+                    UpdateInterrupt();
+                    return;
+                }
+            }
+            error.Value = true;
+            keyStreamEnded.Value = true;
+            UpdateInterrupt();
+        }
+
+        // ah: the low 3 bytes of the key's AES encryption of prand, zero-padded in front. Returned
+        // least significant byte first, as the address holds its hash.
+        private static byte[] Hash(byte[] key, byte[] address)
+        {
+            var block = new byte[AesBlockSize];
+            for(var i = 0; i < HashSize; i++)
+            {
+                block[AesBlockSize - 1 - i] = address[HashSize + i];
+            }
+            using(var aes = AesProvider.GetEcbProvider(key))
+            {
+                aes.EncryptBlockInSitu(Block.UsingBytes(block));
+            }
+            return Enumerable.Range(1, HashSize).Select(i => block[AesBlockSize - i]).ToArray();
         }
 
         private void UpdateInterrupt()
@@ -197,8 +251,9 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         private IFlagRegisterField cryptInterrupt;
         private IFlagRegisterField errorInterrupt;
         private IFlagRegisterField cryptAfterKeyStream;
-        private IFlagRegisterField micValid;
-        private IFlagRegisterField decrypt;
+        private IValueRegisterField status;
+        private IValueRegisterField enable;
+        private IValueRegisterField modeOrKeyCount;
         private IValueRegisterField configurationPointer;
         private IValueRegisterField inputPointer;
         private IValueRegisterField outputPointer;
@@ -212,6 +267,11 @@ namespace Antmicro.Renode.Peripherals.Miscellaneous
         private const int ConfigurationSize = IvOffset + IvSize;
         private const int HeaderSize = 3;
         private const int LengthIndex = 1;
+        private const int AddressResolverEnabled = 3;
+        private const int AddressOffset = 3;
+        private const int AddressSize = 6;
+        private const int HashSize = 3;
+        private const int AesBlockSize = 16;
 
         private enum Registers : long
         {

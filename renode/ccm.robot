@@ -11,6 +11,13 @@ ${OUTPUT}                   0x20030200
 # significant byte first as the CCM reads it, and the IV.
 ${SESSION_KEY}              99ad1b5226a37e3e058e3b8e27c2c666
 ${IV}                       24abdcbabebaafde
+# The specification's sample for ah, the private address hash (Vol 3, Part H, Appendix D.7): an
+# identity resolving key, most significant byte first as the AAR reads it, and the address it
+# resolves, prand 708194 above hash 0dfbaa, least significant byte first as a packet carries it.
+${RESOLVING_KEY}            ec0234a357c8ad05341010a60a397d9b
+${PRIVATE_ADDRESS}          aafb0d948170
+# A key of some other device.
+${OTHER_KEY}                000102030405060708090a0b0c0d0e0f
 
 *** Keywords ***
 Write Hex
@@ -78,6 +85,33 @@ Should Leave An Empty Packet As It Is
     ${packet}=                Read Hex    ${OUTPUT}    3
     Should Be Equal           ${packet}    010000
 
+Resolve
+    [Arguments]               ${address}    ${keys}    ${key_count}
+    # As Zephyr's controller does, with the AAR that shares the CCM's registers: the keys at IRKPTR,
+    # ADDRPTR three bytes before the address, as before a packet's payload, and the events cleared.
+    Write Hex                 ${CONFIGURATION}    ${keys}
+    Write Hex                 ${OUTPUT}    000000${address}
+    Execute Command           ${CCM} WriteDoubleWord 0x504 ${key_count}
+    Execute Command           ${CCM} WriteDoubleWord 0x508 ${CONFIGURATION}
+    Execute Command           ${CCM} WriteDoubleWord 0x510 ${OUTPUT}
+    Execute Command           ${CCM} WriteDoubleWord 0x500 3
+    FOR    ${event}    IN    0x100    0x104    0x108
+        Execute Command           ${CCM} WriteDoubleWord ${event} 0
+    END
+    Execute Command           ${CCM} WriteDoubleWord 0x000 1
+
+Event Should Be
+    [Arguments]               ${offset}    ${expected}
+    ${value}=                 Execute Command    ${CCM} ReadDoubleWord ${offset}
+    Should Be Equal As Integers    ${value.strip()}    ${expected}
+
+Should Not Resolve
+    [Arguments]               ${address}    ${keys}    ${key_count}
+    Resolve                   ${address}    ${keys}    ${key_count}
+    Event Should Be           0x100    1
+    Event Should Be           0x104    0
+    Event Should Be           0x108    1
+
 *** Test Cases ***
 Encrypts A Packet As The Bluetooth Specification Does
     Create The Platform
@@ -124,3 +158,22 @@ Signals The End Of Decryption With An Interrupt
     Should Be Equal As Integers    ${ended.strip()}    1
     ${interrupt}=             Execute Command    ${CCM} IRQ IsSet
     Should Contain            ${interrupt}    True
+
+Resolves A Private Address With Its Key
+    Create The Platform
+    # The key is the second of two, so STATUS, the index of the key that resolved it, is 1.
+    Resolve                   ${PRIVATE_ADDRESS}    ${OTHER_KEY}${RESOLVING_KEY}    2
+    Event Should Be           0x100    1
+    Event Should Be           0x104    1
+    Event Should Be           0x108    0
+    Event Should Be           0x400    1
+
+Doesn't Resolve An Address Without Its Key
+    [Setup]                   Create The Platform
+    [Template]                Should Not Resolve
+    # Only another device's key.
+    ${PRIVATE_ADDRESS}        ${OTHER_KEY}    1
+    # One bit of the hash changed.
+    abfb0d948170              ${OTHER_KEY}${RESOLVING_KEY}    2
+    # The key is there, but beyond the count NIRK gives.
+    ${PRIVATE_ADDRESS}        ${OTHER_KEY}${RESOLVING_KEY}    1

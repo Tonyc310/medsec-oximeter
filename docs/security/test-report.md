@@ -12,7 +12,7 @@ Every test passed in CI [run 61](https://github.com/Tonyc310/medsec-oximeter/act
 |---|---|---|---|
 | End to end | [renode/oximeter.robot](../../renode/oximeter.robot) | 37 | both boards in Renode, joined by a simulated Bluetooth link |
 | Secure boot | [renode/boot.robot](../../renode/boot.robot) | 5 | the oximeter booting through MCUboot in Renode |
-| Simulation models | `flash.robot`, `ccm.robot`, `radio.robot`, `sensor.robot` in [renode/](../../renode/) | 13 | the models this project adds to Renode or fixes, against their specifications or Zephyr's own driver tests |
+| Simulation models | `flash.robot`, `ccm.robot`, `radio.robot`, `sensor.robot` in [renode/](../../renode/) | 15 | the models this project adds to Renode or fixes, against their specifications or Zephyr's own driver tests |
 | Unit, host | [tests/](../../tests/) | 59 | `core/` under AddressSanitizer and UndefinedBehaviorSanitizer |
 | Unit, `native_sim` | `tests/` in [app/](../../app/tests/), [hub/](../../hub/tests/), [common/](../../common/tests/) | 28 | code that needs Zephyr, run as a program on the PC |
 | Fuzzing | [fuzz/](../../fuzz/) | 4 targets | libFuzzer, a minute each, under the same sanitizers |
