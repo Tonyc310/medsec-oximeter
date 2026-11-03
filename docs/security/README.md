@@ -11,7 +11,7 @@ The cybersecurity documentation FDA's premarket guidance (February 2026 edition)
 | Attack trees | the top threats in depth | threat model | Phase 3 |
 | [Updatability and patchability view](updatability.md) | the update path end to end, verification on each device, interrupted and failed updates, third-party fixes | architecture views | draft |
 | [Multi-patient harm view](multi-patient.md) | where one attack could reach many patients, and what defends against it and responds | architecture views | draft |
-| Security use-case views | each use case through its device states, with the controls that act | architecture views | Phase 3 |
+| [Security use-case views](use-cases.md) | each use case through its device states, with the controls that act | architecture views | draft |
 | [Risk assessment](risk-assessment.md) | each threat's exploitability (MITRE's CVSS rubric for medical devices) and severity of patient harm, before and after controls | cybersecurity risk assessment | done for the system as built; the gateway's and backend's threats scored again when they're built |
 | [Security controls](controls.md) | each control's requirement, implementation, threats and tests, by FDA's categories | security architecture | done but for the debug-port lock |
 | [SBOM](sbom.md) | every software component, its version, supplier, identifiers and support, made from each build | SBOM | done |

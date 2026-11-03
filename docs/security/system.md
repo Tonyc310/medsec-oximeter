@@ -162,7 +162,7 @@ flowchart LR
 
 ## Use cases
 
-The security use-case views (in a later document) take each of these in turn, through the device states they pass through:
+The [security use-case views](use-cases.md) take each of these in turn, through the device states they pass through:
 
 | ID | Use case | Device states |
 |---|---|---|
@@ -170,5 +170,5 @@ The security use-case views (in a later document) take each of these in turn, th
 | UC-2 | Measure and send readings | measuring, sending |
 | UC-3 | Raise and clear an alarm | alarming |
 | UC-4 | Set alarm limits | connected, configuring |
-| UC-5 | Update firmware | updating (planned) |
+| UC-5 | Update firmware | updating |
 | UC-6 | Decommission and reuse a device | between patients |
