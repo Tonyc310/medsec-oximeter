@@ -314,7 +314,7 @@ Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPR
 | T-08 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H` | 7.6 | 0.9 Low | Catastrophic | controlled |
 | T-09 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H` | 7.6 | 0.9 Low | Catastrophic | controlled |
 | T-10 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:C/C:N/I:N/A:H` | 7.4 | 2.8 High | Catastrophic | **uncontrolled** |
-| T-11 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:C/C:N/I:N/A:H` | 7.4 | 2.8 High | Catastrophic | **uncontrolled** |
+| T-11 | `CVSS:3.0/AV:A/AC:H/PR:N/UI:N/S:C/C:N/I:N/A:H` | 6.1 | 1.6 Medium | Catastrophic | **uncontrolled** |
 | T-12 | `CVSS:3.0/AV:P/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H` | 7.6 | 0.9 Low | Catastrophic | controlled |
 | T-13 | `CVSS:3.0/AV:A/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N` | 6.5 | 2.8 High | None | controlled |
 
@@ -334,9 +334,9 @@ Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPR
 
 Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:N/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:N/XIL:N/XAH:Y/XAL:NA`
 
-**T-11**, No control yet. As before.
+**T-11**, C-23 keeps a connection for the bonded gateway and drops a central that hasn't paired 30 s after connecting. *Attack complexity*: to keep the gateway out, an attacker now needs two radios, one using the gateway's own address, which they must first learn from its traffic; both must connect while the gateway isn't linked, and win the race to connect again every 30 s. Before the gateway first pairs, or after a reset for a new patient, there's no bond to keep a connection for, so one radio is enough, but it too must win that race every 30 s. *Severity*: as T-10, until its alarm is built.
 
-Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:N/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:N/XIL:N/XAH:Y/XAL:NA`
+Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:N/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:N/XCPM:NA/XIP:N/XAP:N/XCD:N/XID:N/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:N/XCL:N/XIH:N/XIL:N/XAH:Y/XAL:NA`
 
 **T-12**, C-01 and C-02: a gateway pairs only with an oximeter whose seal the backend opens for it, so another bed's needs that oximeter's pairing key, as T-08. Staff pairing or resetting the wrong device is a use error, for the safety risk assessment.
 
@@ -492,7 +492,7 @@ Each uncontrolled risk needs a control, or a reason it can't have one:
 | Threats | What they need |
 |---|---|
 | T-10, a jammed link | It can't be prevented. The gateway and the backend need a technical alarm within 2 s of readings stopping, so the loss isn't silent; C-19 already notices it. With that alarm built, the severity is rated again. |
-| T-11, a held connection | The oximeter should drop a central that doesn't reach security level 4 within a few seconds, and keep a connection free for its bonded gateway; and the alarm of T-10. |
+| T-11, a held connection | C-23 makes keeping the gateway out a race the attacker must win every 30 s. What's left needs the alarm of T-10, so the loss isn't silent. |
 | T-16 and T-36, a flaw in the Bluetooth stack or another component | No control rules out a bug in third-party code, so this can't be designed out. Against it: fuzzing of the oximeter's own parsers (C-10), the weekly check for known vulnerabilities (C-22), signed updates to deliver a fix (C-20), and secure boot, so an exploit doesn't survive a restart (C-08). Still to do: fuzz the Bluetooth protocols Zephyr handles before pairing, and turn off those the oximeter doesn't use. |
 | T-17, a crash an attacker repeats | As T-16, and the alarm of T-10, so the restarts are seen. |
 | T-22, a compromised gateway alters readings | Readings tagged by the oximeter, as its log records are (C-14), so the backend can tell an altered one; and the alarm of T-23 for those dropped. |
@@ -502,7 +502,7 @@ Each uncontrolled risk needs a control, or a reason it can't have one:
 | T-28, a compromised backend | The masters held in a hardware security module, so a compromised server can ask for signatures but can't take the keys; least privilege and monitoring. |
 | T-33 and T-35, a stolen release key | The offline signing service, with access controlled and logged. MCUboot can't be updated, so a release key compromised after devices ship can be replaced only with every device in hand. |
 
-**Conclusion.** The residual risk isn't acceptable yet: fourteen risks are uncontrolled. On the oximeter, T-11 needs a firmware change, and T-10 and T-17 the technical alarm that comes with the gateway and the backend. T-16 and T-36 can't be designed out; they rest on the reasons above and on monitoring and updates after release. The other nine come with the gateway and the backend, and are scored again when those are built. No risk needs the debug-port lock (C-11) to be controlled under these acceptance criteria, but most of the remote threats now come down to reading the oximeter's keys out with it in hand, and the lock is what closes that.
+**Conclusion.** The residual risk isn't acceptable yet: fourteen risks are uncontrolled. On the oximeter, T-10, T-11 and T-17 need the technical alarm that comes with the gateway and the backend. T-16 and T-36 can't be designed out; they rest on the reasons above and on monitoring and updates after release. The other nine come with the gateway and the backend, and are scored again when those are built. No risk needs the debug-port lock (C-11) to be controlled under these acceptance criteria, but most of the remote threats now come down to reading the oximeter's keys out with it in hand, and the lock is what closes that.
 
 ## To the safety risk assessment
 
@@ -515,7 +515,8 @@ Security and safety meet at three hazardous situations: an alarm that doesn't so
 | T-08, T-12 | wrong reading | Low |
 | T-09, T-19 | wrong reading; silent loss of monitoring | Low |
 | T-14, T-34 | all three | Low |
-| T-10, T-11, T-17 | silent loss of monitoring | High |
+| T-10, T-17 | silent loss of monitoring | High |
+| T-11 | silent loss of monitoring | Medium |
 | T-16, T-36 | all three | High |
 | T-22, T-26 | wrong reading; silent loss of monitoring | Medium, design |
 | T-23, T-31 | silent loss of monitoring | High, design |

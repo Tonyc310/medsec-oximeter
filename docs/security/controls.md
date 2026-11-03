@@ -30,6 +30,7 @@ The controls built against the [threat model](threat-model.md), grouped the way 
 | C-20 | Signed updates over Bluetooth, tried before they're kept | updates | T-32, T-33 | built |
 | C-21 | No rollback to an older release | updates | T-34 | built |
 | C-22 | SBOM and vulnerability monitoring | updates | T-36 | built |
+| C-23 | A connection kept for the gateway | resilience | T-11 | built |
 
 Tests are named as their suites name them: Robot tests in [renode/oximeter.robot](../../renode/oximeter.robot) and [renode/boot.robot](../../renode/boot.robot), unit tests of `core/` in [tests/](../../tests/), Zephyr tests on `native_sim` in each application's `tests/`, and the fuzz targets in [fuzz/](../../fuzz/).
 
@@ -211,7 +212,17 @@ Readings, limits and the log travel only over the encrypted link of C-01 and C-0
 
 **Verified by.** "Notices A Silent Oximeter Within Two Seconds".
 
-**Limits.** Noticing isn't alarming: the technical alarm at the gateway and the backend comes with them (T-10, T-23). Nothing stops a device connecting first and holding the oximeter's only connection (T-11).
+**Limits.** Noticing isn't alarming: the technical alarm at the gateway and the backend comes with them (T-10, T-23).
+
+### C-23 A connection kept for the gateway
+
+**Requirement.** A device that connects first can't keep the paired gateway out: the gateway can still connect, and a device that hasn't paired within Bluetooth's pairing timeout loses its connection.
+
+**Built.** The oximeter allows two connections, and who may take the next is decided in [core/src/link_admission.c](../../core/src/link_admission.c) and applied in [app/src/admission.c](../../app/src/admission.c). With nobody connected, any central may. While a central below security level 4 holds a connection, only the bonded gateway may: the controller takes the connection only from the address on its accept list, the bond's. While the gateway is linked, nobody may, and the oximeter stops advertising. A central still below level 4, 30 s after connecting, is dropped. The gateway takes a second connection only with its bond, so it never pairs beside a central that could read the pairing data meant for it.
+
+**Verified by.** "Lets Its Gateway Back While A Stranger Holds A Connection", "Turns Away A Second Stranger", "Takes No Other Central While Its Gateway Is Linked", "Drops A Central That Doesn't Pair In Time", "Keeps Its Gateway Linked Past The Pairing Timeout"; `test_admits_the_central_its_links_allow` (tests/test_link_admission.c).
+
+**Limits.** An attacker with two radios, one using the gateway's address, can still take both connections while the gateway isn't linked. Before the gateway first pairs, or after a reset for a new patient, one radio is enough. Either way they must win the race to connect again every 30 s (T-11). The hub keeps a fixed address. A gateway with a private address must be resolved by the oximeter's controller before the accept list can match it, which the simulator doesn't model; that's for the development kit.
 
 ## Firmware and software updates
 
@@ -248,7 +259,7 @@ Readings, limits and the log travel only over the encrypted link of C-01 and C-0
 | Threat | Why |
 |---|---|
 | T-10 Jamming | It can't be prevented; C-19 notices it, and the alarm it should raise comes with the gateway and the backend |
-| T-11 A device holds the only connection | The oximeter allows one connection and stops advertising while connected |
+| T-11 A device holds the connection | C-23 makes keeping the gateway out a race to win every 30 s; the alarm when readings stop comes with the gateway and the backend, as for T-10 |
 | T-13 Tracking by address and name | The oximeter keeps a fixed address and names itself in its scan response; Bluetooth privacy (resolvable private addresses) is off |
 | T-14, T-15 Firmware written or read through the debug port | C-08 stops altered firmware running, but the debug port stays open until C-11 |
 | T-19 A replaced sensor or injected signals | The firmware checks only the sensor's part number |

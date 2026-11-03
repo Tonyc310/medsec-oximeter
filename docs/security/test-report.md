@@ -6,21 +6,21 @@ How the oximeter's cybersecurity was tested, in the four kinds of testing FDA's 
 
 ## Result
 
-Every test passed in CI [run 49](https://github.com/Tonyc310/medsec-oximeter/actions/runs/40791201419) at commit [8e3f331](https://github.com/Tonyc310/medsec-oximeter/commit/8e3f331), on 29 October 2026 (UTC). CI fails on any failed test, sanitizer report, fuzzer finding, static analysis finding, formatting difference, key found in an image or break in the traceability chain, so a passing run means everything below passed. Each test's name is its expected result: the behavior it checks.
+Every test passed in CI [run 61](https://github.com/Tonyc310/medsec-oximeter/actions/runs/41587121588) at commit [b89f595](https://github.com/Tonyc310/medsec-oximeter/commit/b89f595), on 3 November 2026 (UTC). CI fails on any failed test, sanitizer report, fuzzer finding, static analysis finding, formatting difference, key found in an image or break in the traceability chain, so a passing run means everything below passed. Each test's name is its expected result: the behavior it checks.
 
 | Kind | Where | Tests | How |
 |---|---|---|---|
-| End to end | [renode/oximeter.robot](../../renode/oximeter.robot) | 31 | both boards in Renode, joined by a simulated Bluetooth link |
+| End to end | [renode/oximeter.robot](../../renode/oximeter.robot) | 36 | both boards in Renode, joined by a simulated Bluetooth link |
 | Secure boot | [renode/boot.robot](../../renode/boot.robot) | 5 | the oximeter booting through MCUboot in Renode |
-| Simulation models | `flash.robot`, `ccm.robot`, `radio.robot`, `sensor.robot` in [renode/](../../renode/) | 12 | the models this project adds to Renode or fixes, against their specifications or Zephyr's own driver tests |
-| Unit, host | [tests/](../../tests/) | 58 | `core/` under AddressSanitizer and UndefinedBehaviorSanitizer |
+| Simulation models | `flash.robot`, `ccm.robot`, `radio.robot`, `sensor.robot` in [renode/](../../renode/) | 13 | the models this project adds to Renode or fixes, against their specifications or Zephyr's own driver tests |
+| Unit, host | [tests/](../../tests/) | 59 | `core/` under AddressSanitizer and UndefinedBehaviorSanitizer |
 | Unit, `native_sim` | `tests/` in [app/](../../app/tests/), [hub/](../../hub/tests/), [common/](../../common/tests/) | 28 | code that needs Zephyr, run as a program on the PC |
 | Fuzzing | [fuzz/](../../fuzz/) | 4 targets | libFuzzer, a minute each, under the same sanitizers |
-| Tools | [tools/tests/](../../tools/tests/) | 21 | pytest |
+| Tools | [tools/tests/](../../tools/tests/) | 96 | pytest |
 
 ## Environment
 
-The firmware under test is the build CI makes: the oximeter and MCUboot for the nRF52840 DK, on Zephyr 4.4.2 with the SDK its manifest names. It runs in Renode 1.17, with this project's models of the MAX30101 sensor, the flash controller's timing and the CCM, and a fix to Renode's radio. The hub stands in for the gateway and the backend; Zephyr's Bluetooth shell plays a phone. Nothing has run on hardware yet.
+The firmware under test is the build CI makes: the oximeter and MCUboot for the nRF52840 DK, on Zephyr 4.4.2 with the SDK its manifest names. It runs in Renode 1.17, with this project's models of the MAX30101 sensor, the flash controller's timing and the CCM, and Renode's radio with a fix and the chip's device address match added. The hub stands in for the gateway and the backend; Zephyr's Bluetooth shell plays a phone. Nothing has run on hardware yet.
 
 What the simulation can't show:
 
@@ -46,8 +46,9 @@ The end-to-end and boot tests play each attacker the simulation can:
 - **Forged, altered and old firmware** (T-33, T-34): an image signed with MCUboot's published key, one changed after signing, an unsigned update and one given a security counter outside its signature (CVE-2024-32883) never run, and an older release is erased ("Never Starts An Image The Release Key Didn't Sign", "Erases An Update With Anything The Release Key Didn't Sign", "Refuses An Older Release").
 - **Another gateway, and a device passed to a new patient** (T-12, T-37): "Lets A New Gateway's Pairing Replace The Old One", "Pairs Again Once The Backend Allows It".
 - **An oximeter the factory never provisioned**: "Can't Be Paired Without A Device Key".
+- **A device that connects first and holds on** (T-11): a phone that connects and never pairs doesn't keep the hub out, a second can't connect beside it, none can connect while the hub is linked, and one that hasn't paired 30 s after connecting is dropped, while the hub isn't ("Lets Its Gateway Back While A Stranger Holds A Connection", "Turns Away A Second Stranger", "Takes No Other Central While Its Gateway Is Linked", "Drops A Central That Doesn't Pair In Time", "Keeps Its Gateway Linked Past The Pairing Timeout").
 
-No test covers the threats without a control (T-11, T-13, T-19, T-20, T-23 to T-31, T-35), nor T-08: C-01 addresses a fake oximeter, but no test plays one.
+No test covers the threats without a control (T-13, T-19, T-20, T-23 to T-31, T-35), nor T-08: C-01 addresses a fake oximeter, but no test plays one. Nor does any test play T-11's attacker with a second radio using the gateway's address.
 
 ## Vulnerability testing
 
@@ -81,16 +82,18 @@ None yet. The developer wrote every test here, knowing the design; FDA asks for 
 | A reading that spanned samples the sensor lost would be skewed | the same | [2bcd209](https://github.com/Tonyc310/medsec-oximeter/commit/2bcd209) |
 | No reading from a pulse under a 0.28% perfusion index, where the README promises one from 0.1%: the threshold was compared with the pulse's RMS, not its peak-to-peak size | testing both sides of the perfusion threshold, 0.09% and 0.11% | [8e3f331](https://github.com/Tonyc310/medsec-oximeter/commit/8e3f331) |
 
-Two more were in the test equipment:
+Three more were in the test equipment:
 
 | Defect | Found by | Fixed in |
 |---|---|---|
 | Renode's radio delivered frames the receiver had missed, up to 97 ms late and on other channels: links failed their MIC checks and both Bluetooth controllers trapped on an assertion | end-to-end tests failing intermittently | [a9d4c2b](https://github.com/Tonyc310/medsec-oximeter/commit/a9d4c2b) |
 | Two of the CCM model's tests couldn't fail | auditing the tests, with faults planted in the model | [dc83cd3](https://github.com/Tonyc310/medsec-oximeter/commit/dc83cd3) |
+| Renode's radio had no device address match, so a Bluetooth controller advertising to its accept list could never take a connection | the hub never got back in while a phone held a connection, in a probe of C-23 | [bfdaea0](https://github.com/Tonyc310/medsec-oximeter/commit/bfdaea0) |
 
 ## Open items
 
-- **On the DK**: the debug-port lock (C-11) and what IN133 leaves open on the board's revision; the timing the simulation only models, such as flash stalls, link timing and the gap in monitoring after an update; and penetration testing.
+- **On the DK**: the debug-port lock (C-11) and what IN133 leaves open on the board's revision; a gateway with a private address, which the oximeter's controller must resolve before its accept list matches it (C-23); the timing the simulation only models, such as flash stalls, link timing and the gap in monitoring after an update; and penetration testing.
 - **A second update with a real gateway**: the hub gives up on a request after 5 s, and in one probe it timed out while the oximeter erased the old update's slot. The tests never have.
 - **Readings in noise**: with random noise added to a steady 72 bpm pulse, in eight runs with different noise, the oximeter reads within 1 bpm while the noise carries under a tenth of the pulse's power. Beyond that some readings are 3 to 5 bpm high, one read half the rate, and the rhythm check refuses the signal only once the noise is about as strong as the pulse. The README promises nothing rather than a wrong number. Two causes: the rhythm check accepts a signal too noisy to time to a bpm in four seconds, and the beat is taken at the first bump in the correlation within 90% of its highest, which noise can put before the true peak. Until the analysis is reworked, the rhythm check's threshold has no sharp edge for a test to hold either side of.
-- **Tests not yet written**: a fake oximeter (T-08), and a failed save of the alarm limits (C-16).
+- **An intermittent failure in the simulation**: "Lets Its Gateway Back While A Stranger Holds A Connection" fails in about 3% of runs. Mostly the hub's Bluetooth controller traps on an assertion just after it reconnects, the trap the radio fix above once cured; once, Renode's radio model threw on a frame with nothing after its address. The oximeter was idle at the failure, with no thread stuck. The cause isn't found yet.
+- **Tests not yet written**: a fake oximeter (T-08), a second radio using the gateway's address (T-11), and a failed save of the alarm limits (C-16).
