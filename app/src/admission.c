@@ -27,9 +27,24 @@ static const struct bt_le_adv_param gateway_only =
     BT_LE_ADV_PARAM_INIT(BT_LE_ADV_OPT_CONN | BT_LE_ADV_OPT_FILTER_CONN, BT_GAP_ADV_FAST_INT_MIN_1,
                          BT_GAP_ADV_FAST_INT_MAX_1, NULL);
 
-/* The connection callbacks run on the Bluetooth receive thread, the recycled one on the system
- * work queue. */
-static K_MUTEX_DEFINE(advertising_lock);
+/* Bluetooth's own pairing timeout. The gateway pairs, or encrypts with its bond, well within it; a
+ * central still below level 4 by then is a stranger holding a connection, and is dropped. */
+#define PAIRING_DEADLINE_MS 30000
+
+/* A real deadline is at least PAIRING_DEADLINE_MS of uptime. */
+#define NO_DEADLINE 0
+
+/* The connection callbacks run on the Bluetooth receive thread, the recycled one and the pairing
+ * deadline on the system work queue. */
+static K_MUTEX_DEFINE(links_lock);
+
+/* Uptime by which each connection's central must reach level 4, by connection index. The connected
+ * callback sets it and the disconnected one clears it: bt_conn_foreach can find a connection before
+ * its connected callback runs, which would otherwise meet the last central's deadline. */
+static int64_t deadline[CONFIG_BT_MAX_CONN];
+
+static void drop_unpaired(struct k_work *work);
+static K_WORK_DELAYABLE_DEFINE(pairing_deadline, drop_unpaired);
 
 static void count_link(struct bt_conn *conn, void *data)
 {
@@ -66,7 +81,7 @@ static void advertise(void)
     int err = 0;
 
     bt_addr_le_copy(&gateway, BT_ADDR_LE_ANY);
-    (void)k_mutex_lock(&advertising_lock, K_FOREVER);
+    (void)k_mutex_lock(&links_lock, K_FOREVER);
     (void)bt_le_adv_stop();
     bt_conn_foreach(BT_CONN_TYPE_LE, count_link, &links);
     bt_foreach_bond(BT_ID_DEFAULT, note_gateway, &gateway);
@@ -85,7 +100,7 @@ static void advertise(void)
             err = advertise_with(&gateway_only);
         }
     }
-    (void)k_mutex_unlock(&advertising_lock);
+    (void)k_mutex_unlock(&links_lock);
     if (err != 0) {
         LOG_ERR("advertising failed: %d", err);
     } else if (admitted != LINK_ADMIT_NOBODY) {
@@ -96,18 +111,60 @@ static void advertise(void)
     }
 }
 
+static void drop_if_unpaired(struct bt_conn *conn, void *data)
+{
+    int64_t *next = data;
+    const uint8_t index = bt_conn_index(conn);
+
+    if ((deadline[index] == NO_DEADLINE) || (bt_conn_get_security(conn) >= BT_SECURITY_L4)) {
+        return;
+    }
+    if (k_uptime_get() < deadline[index]) {
+        *next = MIN(*next, deadline[index]);
+        return;
+    }
+    deadline[index] = NO_DEADLINE;
+    LOG_WRN("central didn't pair in time");
+    (void)bt_conn_disconnect(conn, BT_HCI_ERR_AUTH_FAIL);
+}
+
+static void drop_unpaired(struct k_work *work)
+{
+    int64_t next = INT64_MAX;
+
+    ARG_UNUSED(work);
+    (void)k_mutex_lock(&links_lock, K_FOREVER);
+    bt_conn_foreach(BT_CONN_TYPE_LE, drop_if_unpaired, &next);
+    (void)k_mutex_unlock(&links_lock);
+    if (next != INT64_MAX) {
+        (void)k_work_schedule(&pairing_deadline, K_TIMEOUT_ABS_MS(next));
+    }
+}
+
+static void set_deadline(const struct bt_conn *conn, int64_t at)
+{
+    (void)k_mutex_lock(&links_lock, K_FOREVER);
+    deadline[bt_conn_index(conn)] = at;
+    (void)k_mutex_unlock(&links_lock);
+}
+
+/* Zephyr's connection callback types give the connection as non-const, here and below. */
+/* cppcheck-suppress constParameterCallback */
 static void on_connected(struct bt_conn *conn, uint8_t err)
 {
-    ARG_UNUSED(conn);
     if (err == 0u) {
         LOG_INF("central connected");
+        set_deadline(conn, k_uptime_get() + PAIRING_DEADLINE_MS);
+        /* Every deadline is as far off as this one, so one already pending comes first. */
+        (void)k_work_schedule(&pairing_deadline, K_MSEC(PAIRING_DEADLINE_MS));
     }
     advertise();
 }
 
+/* cppcheck-suppress constParameterCallback */
 static void on_disconnected(struct bt_conn *conn, uint8_t reason)
 {
-    ARG_UNUSED(conn);
+    set_deadline(conn, NO_DEADLINE);
     LOG_INF("central disconnected (reason 0x%02x)", reason);
 }
 

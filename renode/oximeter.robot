@@ -30,6 +30,8 @@ ${LAST_RELEASE}             ${CURDIR}/../build/oximeter/app/zephyr/zephyr.signed
 # The longest monitoring may stop for an update, from the gateway's reset command to the first
 # reading after it: the gateway reports the pause, at a time the clinician approved.
 ${MONITORING_GAP}           30
+# How long a central may stay connected without pairing: Bluetooth's own pairing timeout.
+${PAIRING_TIMEOUT}          ${30}
 
 *** Keywords ***
 Start System
@@ -99,7 +101,8 @@ Connect A Phone
     Write Line To Uart        bt init    testerId=${hub}
     Wait For Line On Uart     Bluetooth initialized    testerId=${hub}
     Write Line To Uart        bt connect-name medsec-oximeter    testerId=${hub}
-    Wait For Line On Uart     Connected:    testerId=${hub}    timeout=10
+    # Paused there, so a test can time what follows from the connection.
+    Wait For Line On Uart     Connected:    testerId=${hub}    timeout=10    pauseEmulation=true
 
 Add A Phone
     [Arguments]               ${name}    ${identity}=${EMPTY}
@@ -376,6 +379,21 @@ Takes No Other Central While Its Gateway Is Linked
     ${phone}=                 Add A Phone    phone
     Write Line To Uart        bt connect-name medsec-oximeter    testerId=${phone}
     Should Not Be On Uart     Connected:    testerId=${phone}    timeout=5
+
+Drops A Central That Doesn't Pair In Time
+    Connect A Phone
+    ${connected}=             Virtual Seconds
+    Wait For Line On Uart     Disconnected: .* \\(reason 0x05\\)    testerId=${hub}    treatAsRegex=true
+    ...                       timeout=${PAIRING_TIMEOUT + 5}    pauseEmulation=true
+    ${dropped}=               Virtual Seconds
+    # Dropped at the first connection event past the deadline.
+    Should Be True            ${PAIRING_TIMEOUT} <= ${dropped} - ${connected} < ${PAIRING_TIMEOUT} + 1
+
+Keeps Its Gateway Linked Past The Pairing Timeout
+    Start System
+    Monitor A Patient At 94 Percent
+    # The hub connected a few seconds before its first reading, and paired.
+    Should Not Be On Uart     hub: disconnected    testerId=${hub}    timeout=${PAIRING_TIMEOUT}
 
 Alarms On Limits The Hub Signs
     Start System
