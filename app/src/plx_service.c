@@ -1,5 +1,6 @@
 #include "plx_service.h"
 
+#include "admission.h"
 #include "medsec_bt.h"
 #include "plx.h"
 
@@ -34,54 +35,6 @@ BT_GATT_SERVICE_DEFINE(pulse_oximeter_service, BT_GATT_PRIMARY_SERVICE(BT_UUID_P
 /* attrs[0] declares the service; attrs[1] is the Continuous Measurement characteristic. */
 #define CONTINUOUS_MEASUREMENT (&pulse_oximeter_service.attrs[1])
 
-static const struct bt_data advertising[] = {
-    BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR),
-    BT_DATA_BYTES(BT_DATA_UUID16_ALL, BT_UUID_16_ENCODE(BT_UUID_POS_VAL)),
-};
-
-static const struct bt_data scan_response[] = {
-    BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1u),
-};
-
-static void advertise(void)
-{
-    const int err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, advertising, ARRAY_SIZE(advertising),
-                                    scan_response, ARRAY_SIZE(scan_response));
-
-    if (err != 0) {
-        LOG_ERR("advertising failed: %d", err);
-    } else {
-        LOG_INF("advertising");
-    }
-}
-
-static void on_connected(struct bt_conn *conn, uint8_t err)
-{
-    ARG_UNUSED(conn);
-    if (err == 0u) {
-        LOG_INF("central connected");
-    }
-}
-
-static void on_disconnected(struct bt_conn *conn, uint8_t reason)
-{
-    ARG_UNUSED(conn);
-    LOG_INF("central disconnected (reason 0x%02x)", reason);
-}
-
-/* Connectable advertising stops when a central connects; start it again once that connection's
- * object is free, so the next central can find the device. */
-static void on_recycled(void)
-{
-    advertise();
-}
-
-BT_CONN_CB_DEFINE(connection_callbacks) = {
-    .connected = on_connected,
-    .disconnected = on_disconnected,
-    .recycled = on_recycled,
-};
-
 int plx_service_start(void)
 {
     const int err = bt_enable(NULL);
@@ -96,7 +49,7 @@ int plx_service_start(void)
     if (load_err != 0) {
         LOG_ERR("could not load the bond: %d", load_err);
     }
-    advertise();
+    admission_start();
     return 0;
 }
 

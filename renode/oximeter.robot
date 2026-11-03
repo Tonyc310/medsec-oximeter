@@ -101,6 +101,49 @@ Connect A Phone
     Write Line To Uart        bt connect-name medsec-oximeter    testerId=${hub}
     Wait For Line On Uart     Connected:    testerId=${hub}    timeout=10
 
+Add A Phone
+    [Arguments]               ${name}    ${identity}=${EMPTY}
+    # A third board running Zephyr's Bluetooth shell, beside the hub.
+    Execute Command           pause
+    Execute Command           mach create "${name}"
+    Execute Command           machine LoadPlatformDescription @${CURDIR}/nrf52840dk-hub.repl
+    # Renode reads FICR as zero, so phones would share their identity root and, from the same
+    # simulated random numbers, their private addresses: a second phone needs its own.
+    IF    $identity
+        Execute Command           sysbus Tag <0x100000a4, 0x100000a7> "DEVICEADDR[0]" ${identity}
+        Execute Command           sysbus Tag <0x100000c0, 0x100000cf> "IR" ${identity}
+    END
+    Execute Command           connector Connect sysbus.radio wireless
+    Execute Command           sysbus LoadELF @${PHONE_ELF}
+    ${phone}=                 Create Terminal Tester    ${UART}    machine=${name}
+    Execute Command           start
+    Wait For Line On Uart     to initialize the stack    testerId=${phone}
+    Write Line To Uart        bt init    testerId=${phone}
+    Wait For Line On Uart     Bluetooth initialized    testerId=${phone}
+    RETURN                    ${phone}
+
+Take The Hub Out Of Range
+    Execute Command           pause
+    Execute Command           mach set "hub"
+    Execute Command           connector Disconnect sysbus.radio wireless
+    Execute Command           start
+
+Bring The Hub Back In Range
+    Execute Command           pause
+    Execute Command           mach set "hub"
+    Execute Command           connector Connect sysbus.radio wireless
+    Execute Command           start
+
+A Stranger Holds A Connection
+    # The hub pairs, then goes out of range, and a phone connects and stays without pairing.
+    Start System
+    Monitor A Patient At 94 Percent
+    Take The Hub Out Of Range
+    ${phone}=                 Add A Phone    phone
+    Write Line To Uart        bt connect-name medsec-oximeter    testerId=${phone}
+    Wait For Line On Uart     Connected:    testerId=${phone}    timeout=10
+    RETURN                    ${phone}
+
 Value Handle Of
     [Arguments]               ${uuid}
     # The shell reads 16-bit UUIDs only, so a 128-bit characteristic is used by its value's handle,
@@ -311,6 +354,28 @@ Refuses A Phone That Pairs With Just Works
     # Unauthenticated pairing, as a phone without the oximeter's sealed data would try.
     Write Line To Uart        bt security 2    testerId=${hub}
     Wait For Line On Uart     Security failed:    testerId=${hub}    timeout=10
+
+Lets Its Gateway Back While A Stranger Holds A Connection
+    ${phone}=                 A Stranger Holds A Connection
+    Bring The Hub Back In Range
+    Wait For Line On Uart     link to the oximeter at security level 4    testerId=${hub}    timeout=10
+    Wait For Line On Uart     hub: SpO2 94%    testerId=${hub}    timeout=10
+    # The phone still has its connection: the hub took the other.
+    Should Not Be On Uart     Disconnected:    testerId=${phone}    timeout=0.1
+
+Turns Away A Second Stranger
+    A Stranger Holds A Connection
+    ${second}=                Add A Phone    second phone    identity=0x11223344
+    Write Line To Uart        bt connect-name medsec-oximeter    testerId=${second}
+    # The oximeter never answers its connection request, so its controller gives up on the link.
+    Wait For Line On Uart     Disconnected: .* \\(reason 0x3e\\)    testerId=${second}    treatAsRegex=true    timeout=10
+
+Takes No Other Central While Its Gateway Is Linked
+    Start System
+    Monitor A Patient At 94 Percent
+    ${phone}=                 Add A Phone    phone
+    Write Line To Uart        bt connect-name medsec-oximeter    testerId=${phone}
+    Should Not Be On Uart     Connected:    testerId=${phone}    timeout=5
 
 Alarms On Limits The Hub Signs
     Start System
