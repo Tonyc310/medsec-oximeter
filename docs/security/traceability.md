@@ -22,7 +22,7 @@ test named exists and that this table is up to date.
 | T-10 Radio jamming stops readings and alarms reaching the gateway | [C-19](controls.md#c-19-the-gateway-notices-a-silent-oximeter), [gap](controls.md#threats-without-a-control-yet) | 1 Renode |
 | T-11 An attacker's device connects first and holds the oximeter's only connection | [C-23](controls.md#c-23-a-connection-kept-for-the-gateway), [gap](controls.md#threats-without-a-control-yet) | 5 Renode, 1 unit |
 | T-12 On a ward, a gateway connects to another bed's oximeter, by accident or by an attacker's doing (AS-5) | [C-02](controls.md#c-02-one-gateway-at-a-time) | 2 Renode |
-| T-13 The oximeter's fixed address and name let anyone in range detect and follow it | [gap](controls.md#threats-without-a-control-yet) | none |
+| T-13 The oximeter's fixed address and name let anyone in range detect and follow it | [C-25](controls.md#c-25-a-private-address-and-no-name-over-the-air), [gap](controls.md#threats-without-a-control-yet) | 3 Renode |
 | T-14 Malicious firmware is written through the debug port | [C-08](controls.md#c-08-secure-boot), [C-11](controls.md#c-11-debug-port-locked) (planned), [gap](controls.md#threats-without-a-control-yet) | 2 Renode |
 | T-15 Firmware and memory are read out through the debug port | [C-06](controls.md#c-06-keys-of-each-oximeters-own), [C-11](controls.md#c-11-debug-port-locked) (planned), [gap](controls.md#threats-without-a-control-yet) | 1 Renode, 6 unit |
 | T-16 A crafted Bluetooth packet exploits a bug in the firmware's handlers or the Bluetooth stack, corrupting memory or running code | [C-10](controls.md#c-10-strict-decoding-of-what-other-devices-send) | 6 unit, 4 fuzz |

@@ -342,7 +342,7 @@ Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:N/XPRL:N/XPRZ:NA/XPRS:
 
 Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:H/XAP:N/XCD:H/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
 
-**T-13**, No control yet. As before.
+**T-13**, C-25: the oximeter advertises under a private address that changes, and no name, so what it broadcasts doesn't let anyone follow it. The vector is unchanged: the advertised Pulse Oximeter Service still tells anyone in range that a pulse oximeter is there, and a device that connects can read its device ID and recognize it again.
 
 Rubric answers: `XAVN:Y/XAVT:N/XAVW:Y/XAVR:N/XAVP:NA/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:N/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:N/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:N/XIL:N/XAH:N/XAL:N`
 

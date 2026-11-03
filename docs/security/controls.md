@@ -32,6 +32,7 @@ The controls built against the [threat model](threat-model.md), grouped the way 
 | C-22 | SBOM and vulnerability monitoring | updates | T-36 | built |
 | C-23 | A connection kept for the gateway | resilience | T-11 | built |
 | C-24 | No health data on the console | confidentiality | T-20 | built |
+| C-25 | A private address, and no name over the air | confidentiality | T-13 | built |
 
 Tests are named as their suites name them: Robot tests in [renode/oximeter.robot](../../renode/oximeter.robot) and [renode/boot.robot](../../renode/boot.robot), unit tests of `core/` in [tests/](../../tests/), Zephyr tests on `native_sim` in each application's `tests/`, and the fuzz targets in [fuzz/](../../fuzz/).
 
@@ -161,6 +162,16 @@ Readings, limits and the log travel only over the encrypted link of C-01 and C-0
 
 **Limits.** The console stays open, output only: it shows the firmware version, which tells an attacker which known vulnerabilities apply, and when the oximeter pairs or its limits change.
 
+### C-25 A private address, and no name over the air
+
+**Requirement.** Nothing the oximeter broadcasts lets someone in range follow it from one place, or one day, to the next.
+
+**Built.** The oximeter advertises under a resolvable private address, a new one at each start and every 15 minutes, which only its bonded gateway can resolve, with the identity resolving key the oximeter gives it when they pair. Its advertising carries no name ([app/prj.conf](../../app/prj.conf), [app/src/admission.c](../../app/src/admission.c)).
+
+**Verified by.** "Advertises Under A Private Address"; "Keeps Its Pairing Through A Reset" and "Hears Readings After Every Reconnection", in which the hub recognizes the oximeter's private address with that key.
+
+**Limits.** The advertising still names the Pulse Oximeter Service, which a gateway with no bond needs to find the oximeter, so anyone in range can tell a pulse oximeter is there. A device that connects, as any may while the gateway isn't linked, can read the oximeter's device ID, which pairing needs, and recognize it again by that. In simulation the gateway resolves the address with this project's model of the chip's address resolver; the real one is for the development kit.
+
 ## Event detection and logging
 
 ### C-13 Security event log
@@ -271,7 +282,7 @@ Readings, limits and the log travel only over the encrypted link of C-01 and C-0
 |---|---|
 | T-10 Jamming | It can't be prevented; C-19 notices it, and the alarm it should raise comes with the gateway and the backend |
 | T-11 A device holds the connection | C-23 makes keeping the gateway out a race to win every 30 s; the alarm when readings stop comes with the gateway and the backend, as for T-10 |
-| T-13 Tracking by address and name | The oximeter keeps a fixed address and names itself in its scan response; Bluetooth privacy (resolvable private addresses) is off |
+| T-13 Tracking by address and name | C-25 hides the oximeter's address and name, but its advertising names the Pulse Oximeter Service, and a device that connects can read its device ID |
 | T-14, T-15 Firmware written or read through the debug port | C-08 stops altered firmware running, but the debug port stays open until C-11 |
 | T-19 A replaced sensor or injected signals | The firmware checks only the sensor's part number |
 | T-22 A compromised gateway alters readings | C-03, C-05, C-14 and C-15 stop it forging limits, keeping updates and editing the log, but readings aren't signed end to end |

@@ -10,7 +10,7 @@ Every test passed in CI [run 61](https://github.com/Tonyc310/medsec-oximeter/act
 
 | Kind | Where | Tests | How |
 |---|---|---|---|
-| End to end | [renode/oximeter.robot](../../renode/oximeter.robot) | 37 | both boards in Renode, joined by a simulated Bluetooth link |
+| End to end | [renode/oximeter.robot](../../renode/oximeter.robot) | 38 | both boards in Renode, joined by a simulated Bluetooth link |
 | Secure boot | [renode/boot.robot](../../renode/boot.robot) | 5 | the oximeter booting through MCUboot in Renode |
 | Simulation models | `flash.robot`, `ccm.robot`, `radio.robot`, `sensor.robot` in [renode/](../../renode/) | 15 | the models this project adds to Renode or fixes, against their specifications or Zephyr's own driver tests |
 | Unit, host | [tests/](../../tests/) | 59 | `core/` under AddressSanitizer and UndefinedBehaviorSanitizer |
@@ -46,10 +46,11 @@ The end-to-end and boot tests play each attacker the simulation can:
 - **Forged, altered and old firmware** (T-33, T-34): an image signed with MCUboot's published key, one changed after signing, an unsigned update and one given a security counter outside its signature (CVE-2024-32883) never run, and an older release is erased ("Never Starts An Image The Release Key Didn't Sign", "Erases An Update With Anything The Release Key Didn't Sign", "Refuses An Older Release").
 - **Another gateway, and a device passed to a new patient** (T-12, T-37): "Lets A New Gateway's Pairing Replace The Old One", "Pairs Again Once The Backend Allows It".
 - **An oximeter the factory never provisioned**: "Can't Be Paired Without A Device Key".
+- **Someone following the oximeter by radio** (T-13): a phone scanning sees a private address that changes when the oximeter restarts, and no name ("Advertises Under A Private Address").
 - **Someone with a serial adapter on the console** (T-20): through readings, a limits change and an alarm, the console shows none of them ("Keeps Health Data Off Its Console").
 - **A device that connects first and holds on** (T-11): a phone that connects and never pairs doesn't keep the hub out, a second can't connect beside it, none can connect while the hub is linked, and one that hasn't paired 30 s after connecting is dropped, while the hub isn't ("Lets Its Gateway Back While A Stranger Holds A Connection", "Turns Away A Second Stranger", "Takes No Other Central While Its Gateway Is Linked", "Drops A Central That Doesn't Pair In Time", "Keeps Its Gateway Linked Past The Pairing Timeout").
 
-No test covers the threats without a control (T-13, T-19, T-23 to T-31, T-35), nor T-08: C-01 addresses a fake oximeter, but no test plays one. Nor does any test play T-11's attacker with a second radio using the gateway's address.
+No test covers the threats without a control (T-19, T-23 to T-31, T-35), nor T-08: C-01 addresses a fake oximeter, but no test plays one. Nor does any test play T-11's attacker with a second radio using the gateway's address.
 
 ## Vulnerability testing
 
@@ -83,13 +84,14 @@ None yet. The developer wrote every test here, knowing the design; FDA asks for 
 | A reading that spanned samples the sensor lost would be skewed | the same | [2bcd209](https://github.com/Tonyc310/medsec-oximeter/commit/2bcd209) |
 | No reading from a pulse under a 0.28% perfusion index, where the README promises one from 0.1%: the threshold was compared with the pulse's RMS, not its peak-to-peak size | testing both sides of the perfusion threshold, 0.09% and 0.11% | [8e3f331](https://github.com/Tonyc310/medsec-oximeter/commit/8e3f331) |
 
-Three more were in the test equipment:
+Four more were in the test equipment:
 
 | Defect | Found by | Fixed in |
 |---|---|---|
 | Renode's radio delivered frames the receiver had missed, up to 97 ms late and on other channels: links failed their MIC checks and both Bluetooth controllers trapped on an assertion | end-to-end tests failing intermittently | [a9d4c2b](https://github.com/Tonyc310/medsec-oximeter/commit/a9d4c2b) |
 | Two of the CCM model's tests couldn't fail | auditing the tests, with faults planted in the model | [dc83cd3](https://github.com/Tonyc310/medsec-oximeter/commit/dc83cd3) |
 | Renode's radio had no device address match, so a Bluetooth controller advertising to its accept list could never take a connection | the hub never got back in while a phone held a connection, in a probe of C-23 | [bfdaea0](https://github.com/Tonyc310/medsec-oximeter/commit/bfdaea0) |
+| Renode had no address resolver, so with Bluetooth privacy on, a controller could never recognize a bonded device's private address: the hub could never reconnect | a probe of C-25 | [d43ad76](https://github.com/Tonyc310/medsec-oximeter/commit/d43ad76) |
 
 ## Open items
 

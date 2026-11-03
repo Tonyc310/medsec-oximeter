@@ -35,7 +35,7 @@ The oximeter has no network connection of its own: no IP address and no network 
 
 | Interface | Direction | Carries | Protection |
 |---|---|---|---|
-| Bluetooth LE advertising | out | that it's a pulse oximeter, and its name | none: anyone in range can see it, and its fixed address can be followed |
+| Bluetooth LE advertising | out | that it's a pulse oximeter | anyone in range can see that one is there, but not follow it: its address changes at each start and every 15 minutes, and it doesn't advertise its name |
 | Bluetooth LE, before pairing | in and out | its device ID and its sealed pairing data | nothing else is open; a device that doesn't pair is dropped after 30 s |
 | Bluetooth LE, paired | in and out | readings, alarm state, signed alarm limits, the security log, firmware updates | LE Secure Connections at security level 4, with its one bonded gateway |
 | Serial console | out | the firmware version, Bluetooth events and errors; no readings, alarms or limits | inside the enclosure |

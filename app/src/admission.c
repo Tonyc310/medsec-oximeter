@@ -18,10 +18,6 @@ static const struct bt_data advertising[] = {
     BT_DATA_BYTES(BT_DATA_UUID16_ALL, BT_UUID_16_ENCODE(BT_UUID_POS_VAL)),
 };
 
-static const struct bt_data scan_response[] = {
-    BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1u),
-};
-
 /* The controller takes a connection only from a central on its accept list. */
 static const struct bt_le_adv_param gateway_only =
     BT_LE_ADV_PARAM_INIT(BT_LE_ADV_OPT_CONN | BT_LE_ADV_OPT_FILTER_CONN, BT_GAP_ADV_FAST_INT_MIN_1,
@@ -68,8 +64,7 @@ static void note_gateway(const struct bt_bond_info *bond, void *data)
 
 static int advertise_with(const struct bt_le_adv_param *param)
 {
-    return bt_le_adv_start(param, advertising, ARRAY_SIZE(advertising), scan_response,
-                           ARRAY_SIZE(scan_response));
+    return bt_le_adv_start(param, advertising, ARRAY_SIZE(advertising), NULL, 0u);
 }
 
 /* Advertising stops when a central connects, and the accept list can't change while it runs, so

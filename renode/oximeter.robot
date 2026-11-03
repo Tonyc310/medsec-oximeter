@@ -93,14 +93,33 @@ Reset The Oximeter
     Execute Command           mach set "oximeter"
     Execute Command           machine Reset
 
-Connect A Phone
-    # Zephyr's Bluetooth shell in the hub's place.
+Start A Phone In The Hub's Place
+    # Zephyr's Bluetooth shell.
     Start System              ${PHONE_ELF}
     Start Emulation
     Wait For Line On Uart     to initialize the stack    testerId=${hub}
     Write Line To Uart        bt init    testerId=${hub}
     Wait For Line On Uart     Bluetooth initialized    testerId=${hub}
-    Write Line To Uart        bt connect-name medsec-oximeter    testerId=${hub}
+
+Oximeter's Address
+    [Arguments]               ${phone}
+    # As a phone scanning sees it: in simulation, the oximeter is the only device advertising.
+    Write Line To Uart        bt scan on    testerId=${phone}
+    ${seen}=                  Wait For Line On Uart    [[]DEVICE[]]: .* AD evt type 0,    testerId=${phone}
+    ...                       treatAsRegex=true    timeout=10
+    Write Line To Uart        bt scan off    testerId=${phone}
+    ${address}=               Evaluate    re.search(r"[[]DEVICE[]]: ([0-9A-F:]+) ", str($seen)).group(1)
+    ...                       modules=re
+    RETURN                    ${address}
+
+Connect From
+    [Arguments]               ${phone}
+    ${address}=               Oximeter's Address    ${phone}
+    Write Line To Uart        bt connect ${address} random    testerId=${phone}
+
+Connect A Phone
+    Start A Phone In The Hub's Place
+    Connect From              ${hub}
     # Paused there, so a test can time what follows from the connection.
     Wait For Line On Uart     Connected:    testerId=${hub}    timeout=10    pauseEmulation=true
 
@@ -143,7 +162,7 @@ A Stranger Holds A Connection
     Monitor A Patient At 94 Percent
     Take The Hub Out Of Range
     ${phone}=                 Add A Phone    phone
-    Write Line To Uart        bt connect-name medsec-oximeter    testerId=${phone}
+    Connect From              ${phone}
     Wait For Line On Uart     Connected:    testerId=${phone}    timeout=10
     RETURN                    ${phone}
 
@@ -254,8 +273,9 @@ Lets A New Gateway's Pairing Replace The Old One
     Execute Command           sysbus LoadELF @${HUB_ELF}
     ${second_hub}=            Create Terminal Tester    ${UART}    machine=second hub
     Execute Command           start
-    Wait For Line On Uart     pairing: paired with the oximeter    testerId=${second_hub}    timeout=15
-    Wait For Line On Uart     link to the oximeter at security level 4    testerId=${second_hub}
+    # Pairing ends once the oximeter has sent its keys, after the link is encrypted.
+    Wait For Line On Uart     link to the oximeter at security level 4    testerId=${second_hub}    timeout=15
+    Wait For Line On Uart     pairing: paired with the oximeter    testerId=${second_hub}
     # Back in range, the first hub tries its old bond, which the oximeter no longer has.
     Execute Command           mach set "second hub"
     Execute Command           connector Disconnect sysbus.radio wireless
@@ -381,7 +401,7 @@ Lets Its Gateway Back While A Stranger Holds A Connection
 Turns Away A Second Stranger
     A Stranger Holds A Connection
     ${second}=                Add A Phone    second phone    identity=0x11223344
-    Write Line To Uart        bt connect-name medsec-oximeter    testerId=${second}
+    Connect From              ${second}
     # The oximeter never answers its connection request, so its controller gives up on the link.
     Wait For Line On Uart     Disconnected: .* \\(reason 0x3e\\)    testerId=${second}    treatAsRegex=true    timeout=10
 
@@ -389,8 +409,9 @@ Takes No Other Central While Its Gateway Is Linked
     Start System
     Monitor A Patient At 94 Percent
     ${phone}=                 Add A Phone    phone
-    Write Line To Uart        bt connect-name medsec-oximeter    testerId=${phone}
-    Should Not Be On Uart     Connected:    testerId=${phone}    timeout=5
+    # The oximeter doesn't even advertise.
+    Write Line To Uart        bt scan on    testerId=${phone}
+    Should Not Be On Uart     [[]DEVICE[]]:    testerId=${phone}    treatAsRegex=true    timeout=5
 
 Drops A Central That Doesn't Pair In Time
     Connect A Phone
@@ -616,3 +637,18 @@ Keeps Health Data Off Its Console
     Wait For Line On Uart     ALARM from oximeter: SpO2 low    testerId=${hub}
     Should Not Be On Uart     SpO2|bpm|ALARM|no pulse    testerId=${oximeter}    treatAsRegex=true
     ...                       timeout=2
+
+Advertises Under A Private Address
+    # Anyone in range sees an address that changes, and no name: nothing to follow the oximeter by
+    # from one place, or one day, to the next (threat T-13).
+    Start A Phone In The Hub's Place
+    ${before}=                Oximeter's Address    ${hub}
+    # A resolvable private address: the top two bits of its most significant byte are 01.
+    Should Match Regexp       ${before}    ^[4-7]
+    # Scanning actively, the phone asks for the scan response that carried the name.
+    Write Line To Uart        bt scan on    testerId=${hub}
+    Should Not Be On Uart     medsec-oximeter    testerId=${hub}    timeout=3
+    Write Line To Uart        bt scan off    testerId=${hub}
+    Reset The Oximeter
+    ${after}=                 Oximeter's Address    ${hub}
+    Should Not Be Equal       ${before}    ${after}
