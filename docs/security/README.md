@@ -17,7 +17,8 @@ The cybersecurity documentation FDA's premarket guidance (February 2026 edition)
 | [SBOM](sbom.md) | every software component, its version, supplier, identifiers and support, made from each build | SBOM | done |
 | [Vulnerability assessment](vulnerabilities.md) | each component's known vulnerabilities and what they mean for this device, checked against NVD every week | vulnerability assessment | done |
 | [Test report](test-report.md) | how each kind of testing FDA names was done, the result, the defects found and what's open | cybersecurity testing | done but for hardware and penetration testing |
-| Management plan and labeling | postmarket vulnerability handling; what users are told | management plan; labeling | Phase 7 |
+| [Management plan](management-plan.md) | watching for vulnerabilities after release, assessing them, timelines, fixes, coordinated disclosure, telling users | management plan | draft |
+| Labeling | what users are told about the device's security | labeling | Phase 7 |
 | [Traceability](traceability.md) | threat → control → tests, checked on every push | traceability | done for the controls built |
 
 ## IDs
