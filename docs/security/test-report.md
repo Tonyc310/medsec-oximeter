@@ -10,7 +10,7 @@ Every test passed in CI [run 61](https://github.com/Tonyc310/medsec-oximeter/act
 
 | Kind | Where | Tests | How |
 |---|---|---|---|
-| End to end | [renode/oximeter.robot](../../renode/oximeter.robot) | 38 | both boards in Renode, joined by a simulated Bluetooth link |
+| End to end | [renode/oximeter.robot](../../renode/oximeter.robot) | 39 | both boards in Renode, joined by a simulated Bluetooth link |
 | Secure boot | [renode/boot.robot](../../renode/boot.robot) | 5 | the oximeter booting through MCUboot in Renode |
 | Simulation models | `flash.robot`, `ccm.robot`, `radio.robot`, `sensor.robot` in [renode/](../../renode/) | 15 | the models this project adds to Renode or fixes, against their specifications or Zephyr's own driver tests |
 | Unit, host | [tests/](../../tests/) | 59 | `core/` under AddressSanitizer and UndefinedBehaviorSanitizer |

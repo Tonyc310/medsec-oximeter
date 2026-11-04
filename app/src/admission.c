@@ -39,6 +39,9 @@ static K_MUTEX_DEFINE(links_lock);
  * its connected callback runs, which would otherwise meet the last central's deadline. */
 static int64_t deadline[CONFIG_BT_MAX_CONN];
 
+/* Whom the oximeter advertises to now, under links_lock. */
+static link_admission_t advertised = LINK_ADMIT_NOBODY;
+
 static void drop_unpaired(struct k_work *work);
 static K_WORK_DELAYABLE_DEFINE(pairing_deadline, drop_unpaired);
 
@@ -67,8 +70,9 @@ static int advertise_with(const struct bt_le_adv_param *param)
     return bt_le_adv_start(param, advertising, ARRAY_SIZE(advertising), NULL, 0u);
 }
 
-/* Advertising stops when a central connects, and the accept list can't change while it runs, so
- * every change to the links stops it and starts it again as link_admission decides. */
+/* Advertising stops when a central connects, and the accept list can't change while it runs, so it
+ * starts again as link_admission decides whenever that changes. Only then: stopping connectable
+ * advertising frees its connection object, and recycling that object calls this again. */
 static void advertise(void)
 {
     link_state_t links = {0};
@@ -77,13 +81,17 @@ static void advertise(void)
 
     bt_addr_le_copy(&gateway, BT_ADDR_LE_ANY);
     (void)k_mutex_lock(&links_lock, K_FOREVER);
-    (void)bt_le_adv_stop();
     bt_conn_foreach(BT_CONN_TYPE_LE, count_link, &links);
     bt_foreach_bond(BT_ID_DEFAULT, note_gateway, &gateway);
     links.bonded = !bt_addr_le_eq(&gateway, BT_ADDR_LE_ANY);
 
     const link_admission_t admitted = link_admission(links);
 
+    if (admitted == advertised) {
+        (void)k_mutex_unlock(&links_lock);
+        return;
+    }
+    (void)bt_le_adv_stop();
     if (admitted == LINK_ADMIT_ANYONE) {
         err = advertise_with(BT_LE_ADV_CONN_FAST_1);
     } else if (admitted == LINK_ADMIT_GATEWAY) {
@@ -95,6 +103,7 @@ static void advertise(void)
             err = advertise_with(&gateway_only);
         }
     }
+    advertised = (err == 0) ? admitted : LINK_ADMIT_NOBODY;
     (void)k_mutex_unlock(&links_lock);
     if (err != 0) {
         LOG_ERR("advertising failed: %d", err);
@@ -147,6 +156,10 @@ static void set_deadline(const struct bt_conn *conn, int64_t at)
 /* cppcheck-suppress constParameterCallback */
 static void on_connected(struct bt_conn *conn, uint8_t err)
 {
+    /* The controller stops advertising as it reports a connection. */
+    (void)k_mutex_lock(&links_lock, K_FOREVER);
+    advertised = LINK_ADMIT_NOBODY;
+    (void)k_mutex_unlock(&links_lock);
     if (err == 0u) {
         LOG_INF("central connected");
         set_deadline(conn, k_uptime_get() + PAIRING_DEADLINE_MS);

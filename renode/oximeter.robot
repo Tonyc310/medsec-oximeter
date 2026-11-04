@@ -428,6 +428,22 @@ Keeps Its Gateway Linked Past The Pairing Timeout
     # The hub connected a few seconds before its first reading, and paired.
     Should Not Be On Uart     hub: disconnected    testerId=${hub}    timeout=${PAIRING_TIMEOUT}
 
+Keeps Running When A Central Leaves Mid-Pairing
+    Start A Phone In The Hub's Place
+    ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
+    ${address}=               Oximeter's Address    ${hub}
+    # The phone claims the oximeter's out-of-band data, so the oximeter takes its pairing request
+    # and waits for the rest of the pairing.
+    Write Line To Uart        bt oob-remote ${address} random 01 02    testerId=${hub}
+    Write Line To Uart        bt connect ${address} random    testerId=${hub}
+    Wait For Line On Uart     Connected:    testerId=${hub}    timeout=10    pauseEmulation=true
+    Write Line To Uart        bt security 2    testerId=${hub}    waitForEcho=false
+    Execute Command           emulation RunFor "0.2"
+    Take The Hub Out Of Range
+    Wait For Line On Uart     central disconnected    testerId=${oximeter}    timeout=10
+    # The watchdog would reset an oximeter stuck after the link, and it would start again.
+    Should Not Be On Uart     started    testerId=${oximeter}    timeout=5
+
 Alarms On Limits The Hub Signs
     Start System
     Monitor A Patient At 94 Percent
