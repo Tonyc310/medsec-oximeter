@@ -156,10 +156,11 @@ jobs:
           name: smp-fuzz-crashes
           path: build/smp_fuzz/crashes/
 
-      # What a central that never pairs can send the oximeter's Bluetooth host, under libFuzzer for
-      # a minute (fuzz/bt_host): any frame on ATT, LE signalling or SMP, through a controller the
-      # fuzzer plays. Built with clang; UBSan stops at anything it finds, and a case slower than
-      # 10 s fails too.
+      # What a central that never pairs can send the oximeter's Bluetooth host and services, under
+      # libFuzzer for a minute (fuzz/bt_host): any frame on ATT, LE signalling or SMP, through a
+      # controller the fuzzer plays. Built with clang; UBSan stops at anything it finds, a case
+      # slower than 10 s fails, and so does a central below level 4 reaching what the services keep
+      # for the paired gateway (C-04).
       - name: Fuzz the Bluetooth host
         env:
           ZEPHYR_TOOLCHAIN_VARIANT: host/llvm

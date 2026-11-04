@@ -7,3 +7,6 @@ AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
 AllowShortBlocksOnASingleLine: Never
 IndentCaseLabels: false
+ForEachMacros:
+  - 'STRUCT_SECTION_FOREACH'
+SpaceBeforeParens: ControlStatementsExceptControlMacros

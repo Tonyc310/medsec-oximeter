@@ -1,12 +1,19 @@
-/* Any bytes, as a central that never pairs could send them to the oximeter's Bluetooth host: each
- * case connects, delivers L2CAP frames on any channel, and leaves. */
+/* Any bytes, as a central that never pairs could send them to the oximeter: each case connects,
+ * delivers L2CAP frames on any channel, and leaves. The oximeter's own Bluetooth services and
+ * admission answer, started as the firmware starts them. */
+#include "alarm_service.h"
+#include "device_identity.h"
+#include "event_log.h"
 #include "hci_fuzz.h"
+#include "log_mac.h"
+#include "paired_only.h"
+#include "pairing.h"
+#include "pairing_seal.h"
+#include "plx_service.h"
 
 #include <irq_ctrl.h>
 #include <nsi_cpu_if.h>
 #include <nsi_main_semipublic.h>
-#include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
 #include <zephyr/irq.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/byteorder.h>
@@ -24,20 +31,6 @@
  * of one. */
 #define RAW_START 0xFEu
 #define RAW_REST 0xFFu
-
-static void advertise(void)
-{
-    (void)bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, NULL, 0u, NULL, 0u);
-}
-
-static void on_recycled(void)
-{
-    advertise();
-}
-
-BT_CONN_CB_DEFINE(harness_callbacks) = {
-    .recycled = on_recycled,
-};
 
 static const uint8_t *fuzz_case;
 static size_t fuzz_case_size;
@@ -85,13 +78,25 @@ static void deliver(const uint8_t *data, size_t size)
     hci_fuzz_disconnect(CONNECTION);
 }
 
+/* As app/src/main.c starts them, without the sensor, the watchdog or MCUboot. */
+static bool start_the_oximeter(void)
+{
+    static const struct mcuboot_img_sem_ver version = {.major = 1u};
+    uint8_t key[DEVICE_KEY_SIZE];
+
+    return device_identity_key(DEVICE_KEY_LOG, key) && log_mac_init(key, sizeof key) &&
+           device_identity_key(DEVICE_KEY_PAIRING, key) && pairing_seal_init(key, sizeof key) &&
+           (event_log_start(&version) == 0) && (alarm_service_init() == 0) &&
+           (pairing_init() == 0) && (plx_service_start() == 0);
+}
+
 int main(void)
 {
-    if (bt_enable(NULL) != 0) {
-        printk("Bluetooth didn't start\n");
+    paired_only_watch();
+    if (!start_the_oximeter()) {
+        printk("the oximeter's services didn't start\n");
         abort();
     }
-    advertise();
     IRQ_CONNECT(CONFIG_ARCH_POSIX_FUZZ_IRQ, 0, on_fuzz_case, NULL, 0);
     irq_enable(CONFIG_ARCH_POSIX_FUZZ_IRQ);
     while (true) {
@@ -109,9 +114,10 @@ NATIVE_SIMULATOR_IF int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     static bool booted;
 
     if (!booted) {
-        static char *argv[] = {"bt_host_fuzz", NULL};
+        /* The settings and the security log in simulated flash kept in RAM, not in a file. */
+        static char *argv[] = {"bt_host_fuzz", "-flash_in_ram", NULL};
 
-        nsi_init(1, argv);
+        nsi_init(2, argv);
         booted = true;
     }
     fuzz_case = data;

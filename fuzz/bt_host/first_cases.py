@@ -5,7 +5,7 @@ Each case is a series of packets, each a channel byte, a length byte and then it
 fuzz/bt_host/src/main.c reads them; the harness adds each frame's L2CAP header. There's a case for
 each command on the three channels a central reaches before pairing, ATT, LE signalling and SMP,
 with the parameters it takes, so libFuzzer starts inside every handler rather than having to guess
-an opcode and its length together.
+an opcode and its length together. One more reads and writes every handle.
 """
 
 import argparse
@@ -102,6 +102,13 @@ CASES = {
     # A write in two packets: the start of the frame, with its header, then the rest.
     "fragments": packet(RAW_START, WRITE_FRAME[:10]) + packet(RAW_REST, WRITE_FRAME[10:]),
 }
+# A read and a write of every handle, past the oximeter's last, so each run tries the permissions
+# of every attribute it has (C-04).
+LAST_HANDLE = 0x0030
+CASES["every-handle"] = b"".join(
+    att(0x0A, struct.pack("<H", handle)) + att(0x12, struct.pack("<H", handle) + b"\x01\x00")
+    for handle in range(0x0001, LAST_HANDLE + 1)
+)
 CASES |= {f"att-{name}": att(*pdu) for name, pdu in ATT_PDUS.items()}
 CASES |= {
     f"smp-{name}": packet(SMP, bytes([code]) + data) for name, (code, data) in SMP_PDUS.items()

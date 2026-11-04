@@ -15,6 +15,7 @@
 #define RETURN_MAX 64u
 #define ACL_SIZE 251u
 #define ACL_COUNT 4u
+#define CONTROLLER_STACK_SIZE 2048
 
 static bt_hci_recv_t host_recv;
 static const struct device *controller;
@@ -155,10 +156,18 @@ static void report_sent(struct k_work *work)
 
 static K_WORK_DEFINE(sent_work, report_sent);
 
+/* The reports come from a thread of the controller's own, above every host thread, as the
+ * nRF52840's controller sends its events: the host and the oximeter wait on the system work queue
+ * for commands to complete, and the host can't send them while packets wait to be reported. */
+static K_THREAD_STACK_DEFINE(controller_stack, CONTROLLER_STACK_SIZE);
+static struct k_work_q controller_queue;
+
 static int fuzz_open(const struct device *dev, bt_hci_recv_t recv)
 {
     controller = dev;
     host_recv = recv;
+    k_work_queue_start(&controller_queue, controller_stack, K_THREAD_STACK_SIZEOF(controller_stack),
+                       K_PRIO_COOP(CONFIG_BT_DRIVER_RX_HIGH_PRIO), NULL);
     return 0;
 }
 
@@ -176,7 +185,7 @@ static int fuzz_send(const struct device *dev, struct net_buf *buf)
 
         sent_handle = bt_acl_handle(sys_le16_to_cpu(header->handle));
         (void)atomic_inc(&sent);
-        (void)k_work_submit(&sent_work);
+        (void)k_work_submit_to_queue(&controller_queue, &sent_work);
     }
     net_buf_unref(buf);
     return 0;

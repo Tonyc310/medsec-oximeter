@@ -10,13 +10,13 @@ test named exists and that this table is up to date.
 
 | Threat | Controls | Tests |
 |---|---|---|
-| T-01 A device that isn't the patient's gateway connects and writes alarm limits, such as an SpO2 limit of 50% (AS-2) | [C-01](controls.md#c-01-pairing-authenticated-out-of-band), [C-03](controls.md#c-03-signed-alarm-limit-changes), [C-04](controls.md#c-04-an-authenticated-link-for-everything-but-identification), [C-06](controls.md#c-06-keys-of-each-oximeters-own) | 6 Renode, 21 unit, 1 fuzz |
+| T-01 A device that isn't the patient's gateway connects and writes alarm limits, such as an SpO2 limit of 50% (AS-2) | [C-01](controls.md#c-01-pairing-authenticated-out-of-band), [C-03](controls.md#c-03-signed-alarm-limit-changes), [C-04](controls.md#c-04-an-authenticated-link-for-everything-but-identification), [C-06](controls.md#c-06-keys-of-each-oximeters-own) | 6 Renode, 21 unit, 2 fuzz |
 | T-02 A man in the middle between gateway and oximeter changes limits in transit | [C-01](controls.md#c-01-pairing-authenticated-out-of-band), [C-03](controls.md#c-03-signed-alarm-limit-changes), [C-07](controls.md#c-07-standard-algorithms-checked-against-published-vectors) | 4 Renode, 20 unit, 1 fuzz |
 | T-03 A captured limits write is replayed later, restoring settings a clinician has since changed | [C-03](controls.md#c-03-signed-alarm-limit-changes) | 2 Renode, 12 unit, 1 fuzz |
 | T-04 Limits change with no record of who changed them, from where, or when | [C-13](controls.md#c-13-security-event-log) | 6 Renode, 11 unit |
-| T-05 Anyone in range reads a patient's alarm limits | [C-04](controls.md#c-04-an-authenticated-link-for-everything-but-identification) | 1 Renode |
+| T-05 Anyone in range reads a patient's alarm limits | [C-04](controls.md#c-04-an-authenticated-link-for-everything-but-identification) | 1 Renode, 1 fuzz |
 | T-06 Limits live only in RAM, so any reset, including an attacker pulling the battery, silently restores the defaults | [C-16](controls.md#c-16-limits-kept-through-a-reset) | 1 Renode, 3 unit |
-| T-07 Anyone in range subscribes to, or sniffs, a patient's readings (AS-1) | [C-01](controls.md#c-01-pairing-authenticated-out-of-band), [C-04](controls.md#c-04-an-authenticated-link-for-everything-but-identification) | 3 Renode, 3 unit |
+| T-07 Anyone in range subscribes to, or sniffs, a patient's readings (AS-1) | [C-01](controls.md#c-01-pairing-authenticated-out-of-band), [C-04](controls.md#c-04-an-authenticated-link-for-everything-but-identification) | 3 Renode, 3 unit, 1 fuzz |
 | T-08 A fake oximeter advertises the Pulse Oximeter Service and the gateway connects to it instead of the patient's | [C-01](controls.md#c-01-pairing-authenticated-out-of-band) | 2 Renode, 3 unit |
 | T-09 A man in the middle alters readings or alarm state in transit | [C-01](controls.md#c-01-pairing-authenticated-out-of-band), [C-07](controls.md#c-07-standard-algorithms-checked-against-published-vectors) | 2 Renode, 8 unit |
 | T-10 Radio jamming stops readings and alarms reaching the gateway | [C-19](controls.md#c-19-the-gateway-notices-a-silent-oximeter), [gap](controls.md#threats-without-a-control-yet) | 1 Renode |

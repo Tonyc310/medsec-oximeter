@@ -73,7 +73,7 @@ Tests are named as their suites name them: Robot tests in [renode/oximeter.robot
 
 **Built.** Every characteristic needs security level 4, through `MEDSEC_PERM_READ_L4` and `MEDSEC_PERM_WRITE_L4` ([app/src/alarm_service.c](../../app/src/alarm_service.c), [app/src/plx_service.c](../../app/src/plx_service.c)), except the device ID and the sealed pairing data, which a gateway reads to pair. MCUmgr's SMP characteristic requires an authenticated link once pairing is on (`CONFIG_MCUMGR_TRANSPORT_BT_PERM_RW_AUTHEN`).
 
-**Verified by.** "Refuses A Phone That Isn't Paired", which tries to read the readings service and the security log, and to start an upload.
+**Verified by.** "Refuses A Phone That Isn't Paired", which tries to read the readings service and the security log, and to start an upload; and the Bluetooth host fuzzer ([fuzz/bt_host](../../fuzz/bt_host)), which reads and writes every handle on each run and stops when a central below level 4 reads anything in the oximeter's services but the device ID, the sealed pairing data, the declarations it reads to find them and its own subscriptions, or writes anything in them. The fuzzer's build leaves out MCUmgr, so only the Renode test tries SMP.
 
 ### C-05 Only the oximeter's self-test keeps an update
 
@@ -129,7 +129,7 @@ Tests are named as their suites name them: Robot tests in [renode/oximeter.robot
 
 **Built.** The decoders in `core/` check length, flags and range before taking anything: limits ([core/src/alarm.c](../../core/src/alarm.c)), limit commands ([core/src/limits_auth.c](../../core/src/limits_auth.c)), readings at the hub ([core/src/plx.c](../../core/src/plx.c)) and log records ([core/src/security_log.c](../../core/src/security_log.c)). Requests over SMP go to Zephyr's MCUmgr, and everything else a central sends to Zephyr's Bluetooth host.
 
-**Verified by.** The unit tests' refusals, such as `test_rejects_limits_of_the_wrong_length`, `test_keeps_the_limits_in_force_when_it_rejects_new_ones`, `test_rejects_a_length_that_does_not_match_its_flags`, `test_rejects_reserved_flags`, `test_keeps_the_last_reading_when_it_rejects_a_measurement`, `test_ignores_malformed_records_found_in_flash`; the fuzz targets `fuzz_limits_command`, `fuzz_plx_decode` and `fuzz_security_log`, the update-protocol fuzzer ([fuzz/smp](../../fuzz/smp)), and the Bluetooth host fuzzer ([fuzz/bt_host](../../fuzz/bt_host)), which gives Zephyr's host any frame a central could send before pairing; each under AddressSanitizer and UndefinedBehaviorSanitizer.
+**Verified by.** The unit tests' refusals, such as `test_rejects_limits_of_the_wrong_length`, `test_keeps_the_limits_in_force_when_it_rejects_new_ones`, `test_rejects_a_length_that_does_not_match_its_flags`, `test_rejects_reserved_flags`, `test_keeps_the_last_reading_when_it_rejects_a_measurement`, `test_ignores_malformed_records_found_in_flash`; the fuzz targets `fuzz_limits_command`, `fuzz_plx_decode` and `fuzz_security_log`, the update-protocol fuzzer ([fuzz/smp](../../fuzz/smp)), and the Bluetooth host fuzzer ([fuzz/bt_host](../../fuzz/bt_host)), which gives Zephyr's host, with the oximeter's services on it, any frame a central could send before pairing; each under AddressSanitizer and UndefinedBehaviorSanitizer.
 
 **Limits.** The link layer, which Zephyr's controller handles before anything reaches the host, isn't fuzzed: that needs the radio (T-16).
 
