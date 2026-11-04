@@ -15,6 +15,9 @@ ${HUB_OTHER_PAIRING_ELF}    ${CURDIR}/../build/hub-other-pairing/zephyr/zephyr.e
 # Zephyr's Bluetooth shell (tests/bluetooth/shell) in the hub's place: a phone in range, trying
 # what any central can.
 ${PHONE_ELF}                ${CURDIR}/../build/phone/zephyr/zephyr.elf
+# A fake oximeter (renode/fake_oximeter): the real one's characteristics and device ID, without its
+# pairing key.
+${FAKE_OXIMETER_ELF}        ${CURDIR}/../build/fake-oximeter/zephyr/zephyr.elf
 ${SCRIPT}                   ${CURDIR}/oximeter.resc
 ${SIGNING_MASTER}           ${CURDIR}/../build/signing-master.key
 ${PAIRING_MASTER}           ${CURDIR}/../build/pairing-master.key
@@ -103,6 +106,19 @@ Start A Phone In The Hub's Place
     Wait For Line On Uart     to initialize the stack    testerId=${hub}
     Write Line To Uart        bt init    testerId=${hub}
     Wait For Line On Uart     Bluetooth initialized    testerId=${hub}
+
+Start A Fake Oximeter In The Oximeter's Place
+    Start System
+    Execute Command           mach set "oximeter"
+    Execute Command           connector Disconnect sysbus.radio wireless
+    # On the hub's board, which has the CCM its pairing needs, with an address of its own: every
+    # board here has the same one in FICR.
+    Execute Command           mach create "fake oximeter"
+    Execute Command           machine LoadPlatformDescription @${CURDIR}/nrf52840dk-hub.repl
+    Execute Command           sysbus Tag <0x100000a4, 0x100000a7> "DEVICEADDR[0]" 0x0F0E0D0C
+    Execute Command           connector Connect sysbus.radio wireless
+    Execute Command           sysbus LoadELF @${FAKE_OXIMETER_ELF}
+    Start Emulation
 
 Oximeter's Address
     [Arguments]               ${phone}
@@ -690,6 +706,12 @@ Keeps Health Data Off Its Console
     Wait For Line On Uart     ALARM from oximeter: SpO2 low    testerId=${hub}
     Should Not Be On Uart     SpO2|bpm|ALARM|no pulse    testerId=${oximeter}    treatAsRegex=true
     ...                       timeout=2
+
+Refuses A Fake Oximeter
+    Start A Fake Oximeter In The Oximeter's Place
+    Wait For Line On Uart     connected to a pulse oximeter    testerId=${hub}    timeout=10
+    # The fake can't seal its pairing data, so the hub doesn't pair with it, and never subscribes.
+    Should Not Be On Uart     hub: SpO2    testerId=${hub}    timeout=10
 
 Advertises Under A Private Address
     # Anyone in range sees an address that changes, and no name: nothing to follow the oximeter by

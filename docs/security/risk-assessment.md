@@ -322,7 +322,7 @@ Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPR
 
 Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:N/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:H/XID:N/XAD:N/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:N/XIL:N/XAH:N/XAL:N`
 
-**T-08**, C-01: a gateway pairs only with data sealed under the oximeter's own pairing key, so a fake needs a real oximeter's key, read out through its debug port, as T-01. No test plays a fake oximeter yet ([test report](test-report.md#open-items)).
+**T-08**, C-01: a gateway pairs only with data sealed under the oximeter's own pairing key, so a fake needs a real oximeter's key, read out through its debug port, as T-01. Without one it can still hold a gateway that stays connected to it, as the hub does: the readings stop, as under T-10, rather than being replaced.
 
 Rubric answers: `XAVN:N/XAVT:NA/XAVW:NA/XAVR:NA/XAVP:Y/XACL:Y/XPRL:N/XPRZ:NA/XPRS:NA/XUI:N/XS:Y/XCP:H/XCPM:N/XIP:N/XAP:N/XCD:L/XID:H/XAD:H/XCT:N/XIT:N/XAT:N/XCW:N/XIW:N/XAW:N/XCS:N/XIS:N/XAS:N/XCO:N/XIO:N/XAO:N/XCH:Y/XCL:NA/XIH:Y/XIL:NA/XAH:Y/XAL:NA`
 

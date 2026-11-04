@@ -45,7 +45,9 @@ Tests are named as their suites name them: Robot tests in [renode/oximeter.robot
 
 **Built.** LE Secure Connections only, at security level 4 (`CONFIG_BT_SMP_SC_ONLY`). Neither board can show or enter a passkey, so pairing is authenticated out of band: before each pairing the oximeter makes fresh out-of-band data and seals it with AES-CCM under its pairing key, bound to its device ID ([common/src/pairing_seal.c](../../common/src/pairing_seal.c), [app/src/pairing.c](../../app/src/pairing.c)). The gateway opens it with the key the backend derives for that device ([hub/src/pairing.c](../../hub/src/pairing.c)), which proves the oximeter's public key to the gateway. Anyone who can't open the seal can't pair, Just Works included. An oximeter that can't seal its data for the device ID it claims can't pair with a gateway either, which is what stops a fake oximeter (T-08).
 
-**Verified by.** "Pairs Again Once The Backend Allows It", "Refuses A Phone That Pairs With Just Works", and every end-to-end test, since the hub hears readings only over a link it paired at level 4; `test_opens_what_it_sealed`, `test_refuses_what_it_cannot_authenticate`, `test_seals_with_a_fresh_nonce_each_time` (common/tests/pairing_seal). No test yet plays a fake oximeter.
+**Verified by.** "Pairs Again Once The Backend Allows It", "Refuses A Phone That Pairs With Just Works", "Refuses A Fake Oximeter", and every end-to-end test, since the hub hears readings only over a link it paired at level 4; `test_opens_what_it_sealed`, `test_refuses_what_it_cannot_authenticate`, `test_seals_with_a_fresh_nonce_each_time` (common/tests/pairing_seal).
+
+**Limits.** A fake oximeter can't get its readings to the gateway, but it can hold it: the hub stays connected to a device whose pairing data it can't open, so the patient's readings stop, and the hub raises no alarm for that, as under jamming (T-10).
 
 ### C-02 One gateway at a time
 
