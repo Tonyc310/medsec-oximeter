@@ -10,7 +10,7 @@ Every test passed in CI [run 61](https://github.com/Tonyc310/medsec-oximeter/act
 
 | Kind | Where | Tests | How |
 |---|---|---|---|
-| End to end | [renode/oximeter.robot](../../renode/oximeter.robot) | 39 | both boards in Renode, joined by a simulated Bluetooth link |
+| End to end | [renode/oximeter.robot](../../renode/oximeter.robot) | 40 | both boards in Renode, joined by a simulated Bluetooth link |
 | Secure boot | [renode/boot.robot](../../renode/boot.robot) | 5 | the oximeter booting through MCUboot in Renode |
 | Simulation models | `flash.robot`, `ccm.robot`, `radio.robot`, `sensor.robot` in [renode/](../../renode/) | 15 | the models this project adds to Renode or fixes, against their specifications or Zephyr's own driver tests |
 | Unit, host | [tests/](../../tests/) | 59 | `core/` under AddressSanitizer and UndefinedBehaviorSanitizer |
@@ -48,9 +48,9 @@ The end-to-end and boot tests play each attacker the simulation can:
 - **An oximeter the factory never provisioned**: "Can't Be Paired Without A Device Key".
 - **Someone following the oximeter by radio** (T-13): a phone scanning sees a private address that changes when the oximeter restarts, and no name ("Advertises Under A Private Address").
 - **Someone with a serial adapter on the console** (T-20): through readings, a limits change and an alarm, the console shows none of them ("Keeps Health Data Off Its Console").
-- **A device that connects first and holds on** (T-11): a phone that connects and never pairs doesn't keep the hub out, a second can't connect beside it, none can connect while the hub is linked, and one that hasn't paired 30 s after connecting is dropped, while the hub isn't ("Lets Its Gateway Back While A Stranger Holds A Connection", "Turns Away A Second Stranger", "Takes No Other Central While Its Gateway Is Linked", "Drops A Central That Doesn't Pair In Time", "Keeps Its Gateway Linked Past The Pairing Timeout").
+- **A device that connects first and holds on** (T-11): a phone that connects and never pairs doesn't keep the hub out, a second can't connect beside it, none can connect while the hub is linked, and one that hasn't paired 30 s after connecting is dropped, while the hub isn't. A device with the hub's address can connect beside the phone, but each is dropped at its own deadline, and one that leaves mid-pairing doesn't stop the oximeter ("Lets Its Gateway Back While A Stranger Holds A Connection", "Turns Away A Second Stranger", "Takes No Other Central While Its Gateway Is Linked", "Drops A Central That Doesn't Pair In Time", "Drops Two Strangers Each At Its Own Deadline", "Keeps Its Gateway Linked Past The Pairing Timeout", "Keeps Running When A Central Leaves Mid-Pairing").
 
-No test covers the threats without a control (T-19, T-23 to T-31, T-35), nor T-08: C-01 addresses a fake oximeter, but no test plays one. Nor does any test play T-11's attacker with a second radio using the gateway's address.
+No test covers the threats without a control (T-19, T-23 to T-31, T-35), nor T-08: C-01 addresses a fake oximeter, but no test plays one.
 
 ## Vulnerability testing
 
@@ -100,4 +100,4 @@ Four more were in the test equipment:
 - **A second update with a real gateway**: the hub gives up on a request after 5 s, and in one probe it timed out while the oximeter erased the old update's slot. The tests never have.
 - **Readings in noise**: with random noise added to a steady 72 bpm pulse, in eight runs with different noise, the oximeter reads within 1 bpm while the noise carries under a tenth of the pulse's power. Beyond that some readings are 3 to 5 bpm high, one read half the rate, and the rhythm check refuses the signal only once the noise is about as strong as the pulse. The README promises nothing rather than a wrong number. Two causes: the rhythm check accepts a signal too noisy to time to a bpm in four seconds, and the beat is taken at the first bump in the correlation within 90% of its highest, which noise can put before the true peak. Until the analysis is reworked, the rhythm check's threshold has no sharp edge for a test to hold either side of.
 - **An intermittent failure in the simulation**: "Lets Its Gateway Back While A Stranger Holds A Connection" fails in about 3% of runs. Mostly the hub's Bluetooth controller traps on an assertion just after it reconnects, the trap the radio fix above once cured; once, Renode's radio model threw on a frame with nothing after its address. The oximeter was idle at the failure, with no thread stuck. The cause isn't found yet.
-- **Tests not yet written**: a fake oximeter (T-08), a second radio using the gateway's address (T-11), and a failed save of the alarm limits (C-16).
+- **Tests not yet written**: a fake oximeter (T-08) and a failed save of the alarm limits (C-16).

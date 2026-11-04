@@ -20,7 +20,7 @@ test named exists and that this table is up to date.
 | T-08 A fake oximeter advertises the Pulse Oximeter Service and the gateway connects to it instead of the patient's | [C-01](controls.md#c-01-pairing-authenticated-out-of-band) | 2 Renode, 3 unit |
 | T-09 A man in the middle alters readings or alarm state in transit | [C-01](controls.md#c-01-pairing-authenticated-out-of-band), [C-07](controls.md#c-07-standard-algorithms-checked-against-published-vectors) | 2 Renode, 8 unit |
 | T-10 Radio jamming stops readings and alarms reaching the gateway | [C-19](controls.md#c-19-the-gateway-notices-a-silent-oximeter), [gap](controls.md#threats-without-a-control-yet) | 1 Renode |
-| T-11 An attacker's device connects first and holds the oximeter's only connection | [C-23](controls.md#c-23-a-connection-kept-for-the-gateway), [gap](controls.md#threats-without-a-control-yet) | 6 Renode, 1 unit |
+| T-11 An attacker's device connects first and holds the oximeter's only connection | [C-23](controls.md#c-23-a-connection-kept-for-the-gateway), [gap](controls.md#threats-without-a-control-yet) | 7 Renode, 1 unit |
 | T-12 On a ward, a gateway connects to another bed's oximeter, by accident or by an attacker's doing (AS-5) | [C-02](controls.md#c-02-one-gateway-at-a-time) | 2 Renode |
 | T-13 The oximeter's fixed address and name let anyone in range detect and follow it | [C-25](controls.md#c-25-a-private-address-and-no-name-over-the-air), [gap](controls.md#threats-without-a-control-yet) | 3 Renode |
 | T-14 Malicious firmware is written through the debug port | [C-08](controls.md#c-08-secure-boot), [C-11](controls.md#c-11-debug-port-locked) (planned), [gap](controls.md#threats-without-a-control-yet) | 2 Renode |

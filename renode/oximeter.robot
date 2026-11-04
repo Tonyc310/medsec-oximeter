@@ -9,6 +9,9 @@ ${HUB_ELF}                  ${CURDIR}/../build/hub/zephyr/zephyr.elf
 # The same hub built with a signing master of its own, as a gateway the backend let pair but won't
 # sign for.
 ${HUB_OTHER_KEY_ELF}        ${CURDIR}/../build/hub-other-key/zephyr/zephyr.elf
+# A hub built with a pairing master of its own: on the hub's board, a device with the gateway's
+# address but without the keys to pair.
+${HUB_OTHER_PAIRING_ELF}    ${CURDIR}/../build/hub-other-pairing/zephyr/zephyr.elf
 # Zephyr's Bluetooth shell (tests/bluetooth/shell) in the hub's place: a phone in range, trying
 # what any central can.
 ${PHONE_ELF}                ${CURDIR}/../build/phone/zephyr/zephyr.elf
@@ -144,6 +147,16 @@ Add A Phone
     Wait For Line On Uart     Bluetooth initialized    testerId=${phone}
     RETURN                    ${phone}
 
+Add A Device Using The Hub's Address
+    [Arguments]               ${name}
+    # It connects, reads the oximeter's sealed pairing data, can't open it, and stays.
+    Execute Command           pause
+    Execute Command           mach create "${name}"
+    Execute Command           machine LoadPlatformDescription @${CURDIR}/nrf52840dk-hub.repl
+    Execute Command           connector Connect sysbus.radio wireless
+    Execute Command           sysbus LoadELF @${HUB_OTHER_PAIRING_ELF}
+    Execute Command           start
+
 Take The Hub Out Of Range
     Execute Command           pause
     Execute Command           mach set "hub"
@@ -175,6 +188,13 @@ Hub Reading Time
     ...                       re.search(r"[[]([0-9]+):([0-9]+):([0-9]+)[.]([0-9]+),([0-9]+)[]] .*hub: SpO2", str($line))
     ...                       modules=re
     RETURN                    ${{3600 * int($time[1]) + 60 * int($time[2]) + int($time[3]) + int($time[4]) / 1e3 + int($time[5]) / 1e6}}
+
+Milliseconds Stamped On
+    [Arguments]               ${line}
+    # The uptime on a line of Zephyr's log, to the millisecond, as k_uptime_get counts it.
+    ${time}=                  Evaluate    re.search(r"[[]([0-9]+):([0-9]+):([0-9]+)[.]([0-9]+),", str($line))
+    ...                       modules=re
+    RETURN                    ${{(3600 * int($time[1]) + 60 * int($time[2]) + int($time[3])) * 1000 + int($time[4])}}
 
 Value Handle Of
     [Arguments]               ${uuid}
@@ -421,6 +441,23 @@ Drops A Central That Doesn't Pair In Time
     ${dropped}=               Virtual Seconds
     # Dropped at the first connection event past the deadline.
     Should Be True            ${PAIRING_TIMEOUT} <= ${dropped} - ${connected} < ${PAIRING_TIMEOUT} + 1
+
+Drops Two Strangers Each At Its Own Deadline
+    A Stranger Holds A Connection
+    # 5 s later, a second stranger with the gateway's address, which the controller lets in.
+    Execute Command           pause
+    Execute Command           emulation RunFor "5"
+    ${oximeter}=              Create Terminal Tester    ${UART}    machine=oximeter
+    Add A Device Using The Hub's Address    impostor
+    ${connected}=             Wait For Line On Uart    central connected    testerId=${oximeter}    timeout=10
+    # The phone's deadline comes first.
+    Wait For Line On Uart     central didn't pair in time    testerId=${oximeter}    timeout=${PAIRING_TIMEOUT}
+    ${dropped}=               Wait For Line On Uart    central didn't pair in time    testerId=${oximeter}
+    ...                       timeout=10
+    # By the oximeter's own clock: its log lines reach the UART up to a second after it logs them.
+    ${from}=                  Milliseconds Stamped On    ${connected}
+    ${to}=                    Milliseconds Stamped On    ${dropped}
+    Should Be True            ${PAIRING_TIMEOUT} * 1000 <= ${to} - ${from} < (${PAIRING_TIMEOUT} + 1) * 1000
 
 Keeps Its Gateway Linked Past The Pairing Timeout
     Start System
